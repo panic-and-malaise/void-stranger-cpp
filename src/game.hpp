@@ -314,6 +314,7 @@ private:
 
 		// Load all sprites from the sprites directory
 		for (const auto &directory : std::filesystem::recursive_directory_iterator(util::SPRITE_DIRECTORY)) {
+			std::string path = directory.path().string();
 			std::string filename = std::filesystem::path(directory).filename().string();
 
 			if (filename.empty() or filename.substr(0, 3) != "spr") continue;
@@ -321,7 +322,7 @@ private:
 			std::string sprite_name = std::filesystem::path(directory).filename().replace_extension("").string();
 			sf::Texture texture;
 
-			if (texture.loadFromFile(directory.path())) {
+			if (texture.loadFromFile(path)) {
 				textures.emplace(sprite_name, texture);
 				sprites.emplace(sprite_name, textures.at(sprite_name));
 
