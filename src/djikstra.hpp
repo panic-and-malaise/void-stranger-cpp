@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <climits>
 #include <functional>
-#include <iostream>
 #include <map>
 #include <queue>
 #include <vector>
@@ -23,7 +22,7 @@ namespace malaise::algorithm {
 				};
 
 			std::vector<math::Vec2i> get_neighbors(const math::Vec2i& node, const std::vector<math::Vec2i>& walkable) {
-				static const math::Vec2i directions[] = {
+				static const math::Vec2i directions[] = { // possible movement directions, no diagonals
 					{ 1, 0 },
 					{-1, 0 },
 					{ 0, 1 },
@@ -53,15 +52,15 @@ namespace malaise::algorithm {
 			distances[node] = INT_MAX;
 		}
 
-		distances[source] = 0;
+		distances[target] = 0;
 
-		frontier.emplace(source, 0);
+		frontier.emplace(target, 0);
 
 		while (!frontier.empty()) {
 			auto current_node = frontier.top();
 			frontier.pop();
 
-			if (current_node.position == target) // found path to target
+			if (current_node.position == source) // found path from target to source
 				break;
 
 			for (auto neighbor : get_neighbors(current_node.position, graph)) {
@@ -76,18 +75,18 @@ namespace malaise::algorithm {
 			}
 		}
 
-		if (!previous.contains(target)) return {};
+		if (!previous.contains(source)) return {};
 
 		std::vector<math::Vec2i> path;
-		math::Vec2i current = target;
+		math::Vec2i current = source;
 
-		while (current != source) {
+		while (current != target) {
 			path.push_back(current);
 			current = previous[current];
 		}
 
-		path.push_back(source);
-		std::reverse(path.begin(), path.end());
+		path.push_back(target);
+		// std::reverse(path.begin(), path.end());
 
 		return path;
 	}
