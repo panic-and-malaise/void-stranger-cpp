@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <tuple>
 
 using namespace malaise::math;
 
@@ -41,6 +42,10 @@ bool Vec2i::operator==(const Vec2i& v) const {
 	return x == v.x && y == v.y;
 }
 
+bool Vec2i::operator<(const Vec2i& other) const {
+	return std::tie(x, y) < std::tie(other.x, other.y);
+}
+
 void Vec2i::normalize() {
 	float length = std::sqrt(x*x + y*y);
 
@@ -55,4 +60,13 @@ float Vec2i::length() const {
 
 float Vec2i::length_squared() const {
     return x*x + y*y;
+}
+
+// Again, best to avoid for the same reason as Vec2i::length
+float Vec2i::distance(const Vec2i &b) {
+	return std::sqrt(std::pow(x - b.x, 2) + std::pow(y - b.y, 2));
+}
+
+float Vec2i::distance_squared(const Vec2i &b) {
+	return std::pow(x - b.x, 2) + std::pow(y - b.y, 2);
 }

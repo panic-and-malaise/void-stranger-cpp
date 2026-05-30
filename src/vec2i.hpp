@@ -22,11 +22,15 @@ struct Vec2i {
 	Vec2i operator*(const int scalar) const;
 
 	bool operator==(const Vec2i& v) const;
+	bool operator<(const Vec2i& other) const;
 
 	void normalize();
 
 	float length() const;
 	float length_squared() const;
+
+	float distance(const Vec2i &b);
+	float distance_squared(const Vec2i &b);
 };
 
 struct Vec2iHash {

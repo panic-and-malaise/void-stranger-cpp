@@ -31,6 +31,7 @@
 #include "typewriter.hpp"
 #include "util.hpp"
 #include "vec2i.hpp"
+#include "djikstra.hpp"
 
 namespace malaise {
 
@@ -61,6 +62,18 @@ public:
 	// --------------- PUBLIC METHODS ---------------;
 
 	int main_loop(void) {
+		// Testing
+		std::vector<math::Vec2i> graph = {
+			{0, 0}, {1, 0}, {2, 0}, {3, 0},
+			{0, 1}, {1, 1}, {2, 1}, {3, 1},
+			{0, 2}, {1, 2}, {2, 2}, {3, 2},
+			{0, 3}, {1, 3}, {2, 3}, {3, 3},
+		};
+		std::vector<math::Vec2i> path = malaise::algorithm::djikstras_algorithm(graph, {0, 0}, {3, 2});
+		for (auto &node : path) {
+			std::cout << '(' << node.x << ", " << node.y << ")\n";
+		}
+
 		previous_time = render_clock.getElapsedTime();
 
 		while (running) {
