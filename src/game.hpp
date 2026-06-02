@@ -1,6 +1,7 @@
 #ifndef MALAISE_GAME_HPP
 #define MALAISE_GAME_HPP
 
+#include <cstdint>
 #include <ctime>
 #include <filesystem>
 #include <iostream>
@@ -12,6 +13,7 @@
 #include <vector>
 #include <sstream>
 
+#include <SFML/Graphics/Sprite.hpp>
 #include <SFML/Graphics/Font.hpp>
 #include <SFML/Graphics/RenderTarget.hpp>
 #include <SFML/Graphics/RenderWindow.hpp>
@@ -32,6 +34,8 @@
 #include "util.hpp"
 #include "vec2i.hpp"
 #include "djikstra.hpp"
+#include "player.hpp"
+#include "tile.hpp"
 
 namespace malaise {
 
@@ -52,7 +56,7 @@ public:
 		init_sprites();
 
 		init_text_boxes();
-		init_dynamic_text();
+		// init_dynamic_text();
 		init_buttons();
 
 		init_animations();
@@ -68,6 +72,7 @@ public:
 			{0, 1}, {2, 1}, {3, 1},
 			{0, 2}, {2, 2}, {3, 2},
 			{0, 3}, {1, 3}, {2, 3}, {3, 3},
+
 		};
 		std::vector<math::Vec2i> path = malaise::algorithm::djikstras_algorithm(graph, {0, 0}, {3, 0});
 		for (auto &node : path) {
@@ -120,8 +125,8 @@ private:
 	sf::View ui_view;
 
 	// ------------ PROGRAM CONSTANTS ------------;
-	static constexpr size_t WINDOW_WIDTH = 800;
-	static constexpr size_t WINDOW_HEIGHT = 800;
+	static constexpr size_t WINDOW_WIDTH = 832;
+	static constexpr size_t WINDOW_HEIGHT = 832;
 
 	static constexpr size_t REFRESH_RATE = 60;
 	static constexpr size_t PHYSICS_TICK_RATE = 20;
@@ -172,6 +177,8 @@ private:
 	malaise::Cursor cursor;
 	color::ColorPicker color_picker{128, { WINDOW_WIDTH - 128, 128 }};
 
+	Player player;
+	std::vector<std::vector<Tile>> tiles;
 
 	// --------------- PRIVATE METHODS ---------------;
 
@@ -338,6 +345,7 @@ private:
 			if (texture.loadFromFile(path)) {
 				textures.emplace(sprite_name, texture);
 				sprites.emplace(sprite_name, textures.at(sprite_name));
+				sprites[sprite_name].setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
 
 				// TODO: Set default scale and parameters based on final screen size
 
@@ -348,6 +356,19 @@ private:
 		}
 		
 		cursor.load_sprites();
+
+		player.load_sprites(sprites);
+		
+		for (int y = 0; y < 7; y++) {
+			std::vector<Tile> row;
+			for (int x = 0; x < 4; x++) {
+
+				bool is_last_row = y == 6;
+				Tile floor_tile({x, y}, is_last_row ? sprites["spr_floor_1"] : sprites["spr_floor_0"], is_last_row ? TileType::VOID : TileType::FLOOR);
+				row.push_back(floor_tile);
+			}
+			tiles.push_back(row);
+		}
 	}
 
 	void init_animations(void) {
@@ -364,24 +385,24 @@ private:
 	}
 
 	void init_events(void) {
-		event_manager.emplace_event(3.7f, [&]() {
-			if (scrollable_text_objects.empty() || scrollable_text_objects.size() < 6) return;
-			auto txt = scrollable_text_objects.front();
-			txt->push_strings("\n\n(press Enter to continue)");
-		});
+		// event_manager.emplace_event(3.7f, [&]() {
+		// 	if (scrollable_text_objects.empty() || scrollable_text_objects.size() < 6) return;
+		// 	auto txt = scrollable_text_objects.front();
+		// 	txt->push_strings("\n\n(press Enter to continue)");
+		// });
 
 		// Fallback in case someone gets stuck on the second text box
-		event_manager.emplace_event(20.f, [&]() {
-			if (scrollable_text_objects.size() != 5) return;
-			auto txt = scrollable_text_objects.front();
-			txt->push_strings("\n", "\n", "(press ", "Enter", " to scroll text)");
-			animation_matrix.push_and_create(animation::animation_idle(txt->get_segment(8), .3f));
-			animation_matrix.push_current(animation::animation_idle_pop(txt->get_segment(8)));
-		});
+		// event_manager.emplace_event(20.f, [&]() {
+		// 	if (scrollable_text_objects.size() != 5) return;
+		// 	auto txt = scrollable_text_objects.front();
+		// 	txt->push_strings("\n", "\n", "(press ", "Enter", " to scroll text)");
+		// 	animation_matrix.push_and_create(animation::animation_idle(txt->get_segment(8), .3f));
+		// 	animation_matrix.push_current(animation::animation_idle_pop(txt->get_segment(8)));
+		// });
 
-		event_manager.emplace_event(2.f, [&]() {
-			inputs_locked = false;
-		});
+		// event_manager.emplace_event(2.f, [&]() {
+		// 	inputs_locked = false;
+		// });
 	}
 
 	void update_simulation() {
@@ -427,10 +448,12 @@ private:
 	void draw_world_elements(void) {
 		window.setView(world_view);
 
-		auto &gray = sprites["spr_player_down_0"];
-		gray.setPosition(200, 200);
-		gray.setScale(4, 4);
-		window.draw(gray);
+		draw_tiles();
+		player.draw(window);
+		// auto &gray = sprites["spr_player_down_0"];
+		// gray.setPosition(200, 200);
+		// gray.setScale(4, 4);
+		// window.draw(gray);
 
 		// Cell::draw_cells(window, simulation.get_active_cells());
 	}
@@ -445,6 +468,8 @@ private:
 	}
 
 	void update_animations(const float delta_time) {
+		player.tick_animation(delta_time);
+
 		for (auto &animation_queue : animation_matrix.get_animations()) {
 			if (animation_queue.front().is_finished()) // Play animations from the queue in sequence, popping when finished
 				animation_queue.pop();
@@ -610,6 +635,18 @@ private:
 						case sf::Keyboard::Enter:
 							advance_scrollable_text();
 							break;
+						case sf::Keyboard::Up:
+							try_move_player(math::UP);
+							break;
+						case sf::Keyboard::Down:
+							try_move_player(math::DOWN);
+							break;
+						case sf::Keyboard::Left:
+							try_move_player(math::LEFT);
+							break;
+						case sf::Keyboard::Right:
+							try_move_player(math::RIGHT);
+							break;
 						default:
 							handle_single_inputs(event);
 							break;
@@ -742,6 +779,54 @@ private:
 		screen_pixels->update(window);
 		sf::Image img = screen_pixels->copyToImage();
 		return img.getPixel(pos.x, pos.y);
+	}
+
+	inline math::Vec2i world_pos_to_grid(const math::Vec2i world_pos) {
+		return {
+			static_cast<int32_t>(world_pos.x / util::TILE_SIZE / util::SPRITE_SCALE),
+			static_cast<int32_t>(world_pos.y / util::TILE_SIZE / util::SPRITE_SCALE)
+		};
+	}
+
+	inline void try_move_player(const math::Vec2i direction) {
+		math::Vec2i target = direction * util::TILE_SIZE * util::SPRITE_SCALE;
+		math::Vec2i target_world_pos = world_pos_to_grid(player.get_position() + target);
+		TileType target_tile = get_tile_type_at_pos(target_world_pos);
+
+		// std::cout << "(" << target_world_pos.x << ", " << target_world_pos.y << ") : " << static_cast<int>(target_tile) << '\n';
+
+		if (target_tile == TileType::FLOOR)
+			player.move(target);
+	}
+
+	inline TileType get_tile_type_at_pos(const math::Vec2i pos) {
+		if (pos.y > tiles.size()) return TileType::VOID;
+		if (pos.x >= tiles[pos.y].size()) return TileType::VOID;
+
+		Tile selected = tiles[pos.y][pos.x];
+		return selected.get_type();
+	}
+
+	inline std::vector<math::Vec2i> path_through_tiles() {
+		std::vector<math::Vec2i> walkable_tiles;
+		walkable_tiles.reserve(tiles.size());
+
+		for (auto &row : tiles) {
+			for (auto &tile : row) {
+				if (tile.get_type() == TileType::FLOOR)
+					walkable_tiles.push_back(tile.get_position());
+			}
+		}
+
+		return malaise::algorithm::djikstras_algorithm(walkable_tiles, player.get_position_grid(), {14, 0});
+	}
+
+	inline void draw_tiles() {
+		for (auto &row : tiles) {
+			for (auto &tile : row) {
+				tile.draw(window);
+			}
+		}
 	}
 };
 

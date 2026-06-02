@@ -32,6 +32,13 @@ Vec2i Vec2i::operator*(const int scalar) const {
 	};
 }
 
+Vec2i Vec2i::operator*(const size_t scalar) const {
+	return Vec2i{
+		static_cast<int32_t>(x * scalar),
+		static_cast<int32_t>(y * scalar),
+	};
+}
+
 // Hashing function, literally just combines the bits of x and y into a single 64-bit integer,
 // should work nicely with a set implementation
 size_t Vec2iHash::operator()(const Vec2i& v) const {

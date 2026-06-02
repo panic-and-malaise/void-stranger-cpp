@@ -19,6 +19,9 @@ namespace malaise::util {
 const std::string RESOURCE_DIRECTORY = std::filesystem::current_path().string() + "/resources/";
 const std::string SPRITE_DIRECTORY = RESOURCE_DIRECTORY + "sprites/";
 
+static constexpr size_t SPRITE_SCALE = 4;
+static constexpr size_t TILE_SIZE = 16;
+
 inline constexpr float PI = 3.14159265358979323846;
 
 inline sf::Vector2i float_vector_to_integer(const sf::Vector2f vf) {
