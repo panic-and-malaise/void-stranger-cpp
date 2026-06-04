@@ -20,18 +20,28 @@ struct Vec2i {
 	Vec2i operator-(const Vec2i& other) const;
 	void operator+=(const Vec2i& other);
 	Vec2i operator*(const int scalar) const;
+	Vec2i operator*(const size_t scalar) const;
 
 	bool operator==(const Vec2i& v) const;
+	bool operator<(const Vec2i& other) const;
 
 	void normalize();
 
 	float length() const;
 	float length_squared() const;
-};
 
+	float distance(const Vec2i &b);
+	float distance_squared(const Vec2i &b);
+
+};
 struct Vec2iHash {
 	size_t operator()(const Vec2i& v) const;
 };
+
+static const Vec2i UP 	 = { 0, -1 };
+static const Vec2i DOWN  = { 0, 1 };
+static const Vec2i LEFT  = { -1, 0 };
+static const Vec2i RIGHT = { 1, 0 };
 
 }
 

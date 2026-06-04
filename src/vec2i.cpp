@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <tuple>
 
 using namespace malaise::math;
 
@@ -31,6 +32,13 @@ Vec2i Vec2i::operator*(const int scalar) const {
 	};
 }
 
+Vec2i Vec2i::operator*(const size_t scalar) const {
+	return Vec2i{
+		static_cast<int32_t>(x * scalar),
+		static_cast<int32_t>(y * scalar),
+	};
+}
+
 // Hashing function, literally just combines the bits of x and y into a single 64-bit integer,
 // should work nicely with a set implementation
 size_t Vec2iHash::operator()(const Vec2i& v) const {
@@ -39,6 +47,10 @@ size_t Vec2iHash::operator()(const Vec2i& v) const {
 
 bool Vec2i::operator==(const Vec2i& v) const {
 	return x == v.x && y == v.y;
+}
+
+bool Vec2i::operator<(const Vec2i& other) const {
+	return std::tie(x, y) < std::tie(other.x, other.y);
 }
 
 void Vec2i::normalize() {
@@ -55,4 +67,13 @@ float Vec2i::length() const {
 
 float Vec2i::length_squared() const {
     return x*x + y*y;
+}
+
+// Again, best to avoid for the same reason as Vec2i::length
+float Vec2i::distance(const Vec2i &b) {
+	return std::sqrt(std::pow(x - b.x, 2) + std::pow(y - b.y, 2));
+}
+
+float Vec2i::distance_squared(const Vec2i &b) {
+	return std::pow(x - b.x, 2) + std::pow(y - b.y, 2);
 }

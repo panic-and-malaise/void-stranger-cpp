@@ -1,6 +1,8 @@
 #ifndef MALAISE_GAME_HPP
 #define MALAISE_GAME_HPP
 
+#include <SFML/System/Vector2.hpp>
+#include <cstdint>
 #include <ctime>
 #include <filesystem>
 #include <iostream>
@@ -12,6 +14,7 @@
 #include <vector>
 #include <sstream>
 
+#include <SFML/Graphics/Sprite.hpp>
 #include <SFML/Graphics/Font.hpp>
 #include <SFML/Graphics/RenderTarget.hpp>
 #include <SFML/Graphics/RenderWindow.hpp>
@@ -20,17 +23,26 @@
 #include <SFML/Window/Keyboard.hpp>
 #include <SFML/Graphics/Color.hpp>
 #include <SFML/Graphics/Texture.hpp>
+#include <SFML/Audio/Sound.hpp>
+#include <SFML/Audio/Music.hpp>
+#include <SFML/Audio/SoundBuffer.hpp>
 
 #include "animation.hpp"
 #include "animation_matrix.hpp"
 #include "button.hpp"
-#include "color_picker.hpp"
 #include "cursor.hpp"
 #include "event_manager.hpp"
 #include "text_dynamic.hpp"
+#include "tile_definition.hpp"
 #include "typewriter.hpp"
 #include "util.hpp"
 #include "vec2i.hpp"
+#include "djikstra.hpp"
+#include "player.hpp"
+#include "tile.hpp"
+#include "tilemap.hpp"
+#include "tileset.hpp"
+#include "tilemap_renderer.hpp"
 
 namespace malaise {
 
@@ -40,6 +52,10 @@ public:
 		: rng(rd()) {
 
 		print_controls_help();
+		player.set_position({
+			5 * util::TILE_SIZE * util::SPRITE_SCALE,
+			7 * util::TILE_SIZE * util::SPRITE_SCALE
+		});
 
 		init_window();
 		init_simulation(argc, argv);
@@ -48,10 +64,14 @@ public:
 
 		init_fonts();
 		init_cursor();
+
 		init_sprites();
+		init_sounds();
+
+		init_tiles();
 
 		init_text_boxes();
-		init_dynamic_text();
+		// init_dynamic_text();
 		init_buttons();
 
 		init_animations();
@@ -61,6 +81,12 @@ public:
 	// --------------- PUBLIC METHODS ---------------;
 
 	int main_loop(void) {
+		// play_song("mus_extended_encore");
+
+		sf::Music extended_encore;
+		if (extended_encore.openFromFile(util::MUSIC_DIRECTORY + "mus_extended_encore.mp3"))
+			extended_encore.play();
+
 		previous_time = render_clock.getElapsedTime();
 
 		while (running) {
@@ -107,11 +133,11 @@ private:
 	sf::View ui_view;
 
 	// ------------ PROGRAM CONSTANTS ------------;
-	static constexpr size_t WINDOW_WIDTH = 800;
-	static constexpr size_t WINDOW_HEIGHT = 800;
+	static constexpr size_t WINDOW_WIDTH = 1152;
+	static constexpr size_t WINDOW_HEIGHT = 576;
 
 	static constexpr size_t REFRESH_RATE = 60;
-	static constexpr size_t PHYSICS_TICK_RATE = 20;
+	static constexpr size_t PHYSICS_TICK_RATE = 10;
 
 	const std::string WINDOW_TITLE = "SPA-DZ-02";
 
@@ -155,10 +181,22 @@ private:
 	std::unordered_map<std::string, sf::Texture> textures;
 	std::unordered_map<std::string, sf::Sprite> sprites;
 
+	std::unordered_map<std::string, sf::SoundBuffer> sound_buffers;
+	std::unordered_map<std::string, sf::Sound> sounds;
+
 	// ---------- CURRENT POINTERS ----------;
 	malaise::Cursor cursor;
-	color::ColorPicker color_picker{128, { WINDOW_WIDTH - 128, 128 }};
 
+	Player player;
+
+	Tile goal{ {0,0}, {}, TileType::VOID };
+
+	tile::TileMap tilemap{18, 9};
+	tile::TileSet tileset;
+	tile::TileMapRenderer tilemap_renderer;
+	TileType current_tile = TileType::FLOOR;
+
+	std::vector<math::Vec2i> path_to_goal;
 
 	// --------------- PRIVATE METHODS ---------------;
 
@@ -325,8 +363,7 @@ private:
 			if (texture.loadFromFile(path)) {
 				textures.emplace(sprite_name, texture);
 				sprites.emplace(sprite_name, textures.at(sprite_name));
-
-				// TODO: Set default scale and parameters based on final screen size
+				sprites[sprite_name].setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
 
 				// auto &sprite = sprites.at(filename);
 				// sprite.setPosition(WINDOW_WIDTH / 2.f - 128, WINDOW_HEIGHT / 2.f - 128);
@@ -335,6 +372,47 @@ private:
 		}
 		
 		cursor.load_sprites();
+
+		player.load_sprites(sprites);
+		player.init_animations();
+		
+	}
+
+	void init_sounds(void) {
+		for (const auto &directory : std::filesystem::recursive_directory_iterator(util::SOUND_DIRECTORY)) {
+			std::string path = directory.path().string();
+			std::string filename = std::filesystem::path(directory).filename().string();
+
+			if (filename.empty() or filename.substr(0, 3) != "snd") continue;
+
+			std::string sound_name = std::filesystem::path(directory).filename().replace_extension("").string();
+			sf::SoundBuffer buffer;
+
+			if (buffer.loadFromFile(path)) {
+				sound_buffers.emplace(sound_name, buffer);
+				sf::Sound sound;
+				sound.setVolume(50.f);
+				sound.setBuffer(sound_buffers[sound_name]);
+				sounds.emplace(sound_name, sound);
+			}
+		}
+
+		player.init_sounds();
+	}
+
+	void init_tiles(void) {
+		tileset.init_tile_definitions(textures);
+
+		tilemap.set(2, 0, TileType::FLOOR);
+		tilemap.set(2, 1, TileType::FLOOR_UNDER);
+		tilemap.set(3, 0, TileType::GLASS);
+		tilemap.set(4, 0, TileType::GOAL);
+		tilemap.set(5, 0, TileType::WALL_CORNER_TOP_LEFT);
+		tilemap.set(6, 0, TileType::WALL_TOP);
+		tilemap.set(7, 0, TileType::WALL_CORNER_TOP_RIGHT);
+
+		tilemap.load_from_file("lvl_temp.txt");
+		player.set_position_grid(tilemap.get_player_start_pos());
 	}
 
 	void init_animations(void) {
@@ -351,29 +429,30 @@ private:
 	}
 
 	void init_events(void) {
-		event_manager.emplace_event(3.7f, [&]() {
-			if (scrollable_text_objects.empty() || scrollable_text_objects.size() < 6) return;
-			auto txt = scrollable_text_objects.front();
-			txt->push_strings("\n\n(press Enter to continue)");
-		});
+		// event_manager.emplace_event(3.7f, [&]() {
+		// 	if (scrollable_text_objects.empty() || scrollable_text_objects.size() < 6) return;
+		// 	auto txt = scrollable_text_objects.front();
+		// 	txt->push_strings("\n\n(press Enter to continue)");
+		// });
 
 		// Fallback in case someone gets stuck on the second text box
-		event_manager.emplace_event(20.f, [&]() {
-			if (scrollable_text_objects.size() != 5) return;
-			auto txt = scrollable_text_objects.front();
-			txt->push_strings("\n", "\n", "(press ", "Enter", " to scroll text)");
-			animation_matrix.push_and_create(animation::animation_idle(txt->get_segment(8), .3f));
-			animation_matrix.push_current(animation::animation_idle_pop(txt->get_segment(8)));
-		});
+		// event_manager.emplace_event(20.f, [&]() {
+		// 	if (scrollable_text_objects.size() != 5) return;
+		// 	auto txt = scrollable_text_objects.front();
+		// 	txt->push_strings("\n", "\n", "(press ", "Enter", " to scroll text)");
+		// 	animation_matrix.push_and_create(animation::animation_idle(txt->get_segment(8), .3f));
+		// 	animation_matrix.push_current(animation::animation_idle_pop(txt->get_segment(8)));
+		// });
 
-		event_manager.emplace_event(2.f, [&]() {
-			inputs_locked = false;
-		});
+		// event_manager.emplace_event(2.f, [&]() {
+		// 	inputs_locked = false;
+		// });
 	}
 
 	void update_simulation() {
 		while (physics_accumulator >= physics_timestep) { // Limit framerate to physics tickrate
 			if (physics_ticking) {
+				step_towards_goal();
 				// simulation.step();
 			}
 			physics_accumulator -= physics_timestep;
@@ -395,8 +474,6 @@ private:
 			txt.draw(window);
 		}
 
-		color_picker.draw(window);
-
 		if (!scrollable_text_objects.empty())
 			scrollable_text_objects.front()->draw(window);
 
@@ -414,10 +491,12 @@ private:
 	void draw_world_elements(void) {
 		window.setView(world_view);
 
-		auto &gray = sprites["spr_player_down_0"];
-		gray.setPosition(200, 200);
-		gray.setScale(4, 4);
-		window.draw(gray);
+		draw_tiles();
+		player.draw(window);
+		// auto &gray = sprites["spr_player_down_0"];
+		// gray.setPosition(200, 200);
+		// gray.setScale(4, 4);
+		// window.draw(gray);
 
 		// Cell::draw_cells(window, simulation.get_active_cells());
 	}
@@ -432,6 +511,8 @@ private:
 	}
 
 	void update_animations(const float delta_time) {
+		player.tick_animation(delta_time);
+
 		for (auto &animation_queue : animation_matrix.get_animations()) {
 			if (animation_queue.front().is_finished()) // Play animations from the queue in sequence, popping when finished
 				animation_queue.pop();
@@ -483,14 +564,41 @@ private:
 	}
 
 	void handle_window_resize(const unsigned int width, const unsigned int height) {
-		ui_view.setSize(width, height);
-		ui_view.setCenter(width / 2.f, height / 2.f);
+		float window_ratio =
+        static_cast<float>(width) /
+        static_cast<float>(height);
 
-		float old_x = world_view.getSize().x; // Attempt to maintain camera center
-		world_view.setSize(width, height);
-		world_view.zoom(old_x / width);
+		float target_ratio =
+			WINDOW_WIDTH / (float)WINDOW_HEIGHT;
 
-		color_picker.set_position({ static_cast<float>(window.getSize().x - 128.f), 128.f });
+		float size_x = 1.f;
+		float size_y = 1.f;
+		float pos_x = 0.f;
+		float pos_y = 0.f;
+
+		if (window_ratio > target_ratio)
+		{
+			// window too wide
+			size_x = target_ratio / window_ratio;
+			pos_x = (1.f - size_x) / 2.f;
+		}
+		else
+		{
+			// window too tall
+			size_y = window_ratio / target_ratio;
+			pos_y = (1.f - size_y) / 2.f;
+		}
+
+		world_view.setViewport(
+			sf::FloatRect(pos_x, pos_y, size_x, size_y)
+		);
+
+		// ui_view.setSize(width, height);
+		// ui_view.setCenter(width / 2.f, height / 2.f);
+
+		// float old_x = world_view.getSize().x; // Attempt to maintain camera center
+		// world_view.setSize(width, height);
+		// world_view.zoom(old_x / width);
 	}
 
 	void handle_realtime_inputs(void) {
@@ -499,31 +607,25 @@ private:
 		// -------------------- SIMULATION TOGGLE --------------------;
 		physics_ticking = sf::Keyboard::isKeyPressed(sf::Keyboard::Space);
 
-		if (!color_picker.is_hidden() && sf::Keyboard::isKeyPressed(sf::Keyboard::LControl)) {
+		if (sf::Keyboard::isKeyPressed(sf::Keyboard::LControl)) {
 			cursor.set_type(Cursor::Type::EYEDROPPER);
 			return;
 		}
+
+		cursor.set_type(Cursor::Type::PAINT_BRUSH);
 
 		// -------------------- CELL PAINTING --------------------;
 		if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
 			sf::Vector2i pixel_pos = sf::Mouse::getPosition(window);
 			sf::Vector2f world_pos = window.mapPixelToCoords(pixel_pos);
 
-			cursor.set_type(Cursor::Type::PAINT_BRUSH);
-
-			// Don't paint if the color picker is clicked
-			if (color_picker.mouse_set_saturation_value(util::integer_vector_to_float(pixel_pos)))
-				return;
-			else if (color_picker.mouse_set_hue(util::integer_vector_to_float(pixel_pos)))
-				return;
-
 			math::Vec2i center = {
 				static_cast<int32_t>(world_pos.x),
 				static_cast<int32_t>(world_pos.y)
 			};
+			math::Vec2i grid_pos = util::world_pos_to_grid(center);
 
-			// if (pattern_selected)
-			// 	simulation.stamp_pattern(*pattern_selected, { center, color_picker.get_color_rgb() });
+			tilemap.set(grid_pos.x, grid_pos.y, current_tile);
 
 		// -------------------- CELL ERASING --------------------;
 		} else if (!physics_ticking && sf::Mouse::isButtonPressed(sf::Mouse::Right)) {
@@ -536,16 +638,9 @@ private:
 				static_cast<int32_t>(std::floor(world_pos.x)),
 				static_cast<int32_t>(std::floor(world_pos.y))
 			};
+			math::Vec2i grid_pos = util::world_pos_to_grid(center);
 
-			constexpr int ERASER_SIZE = 10;
-			for (int dy = -ERASER_SIZE / 2; dy <= ERASER_SIZE / 2; dy++) {
-				for (int dx = -ERASER_SIZE / 2; dx <= ERASER_SIZE / 2; dx++) {
-					math::Vec2i cell = { center.x + dx, center.y + dy };
-					// simulation.remove_cell_at(cell);
-				}
-			}
-		} else {
-			cursor.set_type(Cursor::Type::PATTERN);
+			tilemap.set(grid_pos.x, grid_pos.y, TileType::VOID);
 		}
 	}
 	
@@ -560,21 +655,20 @@ private:
 				break;
 
 			case sf::Keyboard::Z:
-				// if (!physics_ticking)
-				// 	simulation.undo_stamp();
+				tilemap.export_to_file("lvl_temp.txt");
 				break;
 
-			case sf::Keyboard::C:
-				color_picker.is_hidden() ? color_picker.unhide() : color_picker.hide();
+			case sf::Keyboard::X: {
+				path_to_goal = path_through_tiles();
 				break;
-
-			case sf::Keyboard::X:
-				color_picker.swap_colors();
-				break;
-
+			}
 			default:
 				break;
 		}
+	}
+
+	void handle_scroll_tile_switching(const float scroll_delta) {
+		scroll_tiles(scroll_delta > 0.f ? 1 : -1);
 	}
 
 	void handle_sfml_events(void) {
@@ -597,15 +691,25 @@ private:
 						case sf::Keyboard::Enter:
 							advance_scrollable_text();
 							break;
+						case sf::Keyboard::Up:
+							try_move_player(math::UP);
+							break;
+						case sf::Keyboard::Down:
+							try_move_player(math::DOWN);
+							break;
+						case sf::Keyboard::Left:
+							try_move_player(math::LEFT);
+							break;
+						case sf::Keyboard::Right:
+							try_move_player(math::RIGHT);
+							break;
 						default:
 							handle_single_inputs(event);
 							break;
 					}
 					break;
 				case sf::Event::MouseWheelScrolled: {
-					// if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift))
-					// else
-					// 	handle_mouse_zoom(event.mouseWheelScroll.delta);
+					handle_scroll_tile_switching(event.mouseWheelScroll.delta);
 					break;
 				}
 				case sf::Event::MouseButtonPressed:
@@ -620,11 +724,11 @@ private:
 
 							// Eyedropper logic
 							if (cursor.get_type() == Cursor::Type::EYEDROPPER) {
-								sf::Vector2i pixel_pos = sf::Mouse::getPosition(window);
-								sf::Color hovered_color = get_screen_pixel(pixel_pos);
+								sf::Vector2i hover_mouse_pos = sf::Mouse::getPosition(window);
+								sf::Vector2f hover_world_pos = window.mapPixelToCoords(hover_mouse_pos);
+								math::Vec2i hover_grid_pos = util::world_pos_to_grid(hover_world_pos);
 
-								cursor.set_hovered_color(hovered_color);
-								color_picker.set_current_color(hovered_color);
+								current_tile = tilemap.get(hover_grid_pos.x, hover_grid_pos.y);
 							}
 
 							break;
@@ -729,6 +833,94 @@ private:
 		screen_pixels->update(window);
 		sf::Image img = screen_pixels->copyToImage();
 		return img.getPixel(pos.x, pos.y);
+	}
+
+	inline math::Vec2i world_pos_to_grid(const math::Vec2i world_pos) {
+		return {
+			static_cast<int32_t>(world_pos.x / util::TILE_SIZE / util::SPRITE_SCALE),
+			static_cast<int32_t>(world_pos.y / util::TILE_SIZE / util::SPRITE_SCALE)
+		};
+	}
+
+	inline void try_move_player(const math::Vec2i direction) {
+		math::Vec2i target = direction * util::TILE_SIZE * util::SPRITE_SCALE;
+		math::Vec2i target_grid_pos = util::world_pos_to_grid(player.get_position() + target);
+
+		tile::TileDefinition target_tile = tileset.definition_for(tilemap.get(target_grid_pos.x, target_grid_pos.y));
+		player.move(target, target_tile);
+		if (target_tile.is_stairs and not tilemap.get_level_next().empty()) {
+			tilemap.load_from_file(tilemap.get_level_next());
+			player.set_position_grid(tilemap.get_player_start_pos());
+		}
+	}
+
+	inline std::vector<math::Vec2i> path_through_tiles() {
+		std::vector<math::Vec2i> walkable_tiles;
+		walkable_tiles.reserve(tilemap.get_size());
+
+		math::Vec2i goal{};
+
+		for (int32_t y = 0; y < tilemap.get_height(); y++) {
+			for (int32_t x = 0; x < tilemap.get_width(); x++) {
+				const TileType tile = tilemap.get(x, y);
+				tile::TileDefinition definition = tileset.definition_for(tile);
+				math::Vec2i position = {x, y};
+
+				if (!definition.is_collidable and !definition.is_fall)
+					walkable_tiles.push_back(position);
+				if (definition.is_stairs)
+					goal = position;
+			}
+		}
+
+		return malaise::algorithm::djikstras_algorithm(walkable_tiles, player.get_position_grid(), goal);
+	}
+
+	inline void draw_tiles() {
+		tilemap_renderer.draw(window, tilemap, tileset);
+
+		// painting tile
+		sf::Sprite sprite;
+		sprite.setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
+
+		const sf::Texture *texture = tileset.texture(current_tile);
+		if (!texture) return;
+		sprite.setTexture(*texture);
+		sprite.setTextureRect(tileset.rect_for(current_tile));
+		sprite.setPosition(0, 512);
+		window.draw(sprite);
+	}
+
+	inline void step_towards_goal() {
+		if (path_to_goal.empty()) return;
+		auto next_step = path_to_goal.front();
+		path_to_goal.erase(path_to_goal.begin());
+		math::Vec2i target = next_step - player.get_position_grid();
+		std::cout << "(" << next_step.x << ", " << next_step.y << ") | (" << target.x << ", " << target.y << ")\n";
+		try_move_player(target);
+	}
+
+	inline void play_song(const std::string &song_name) {
+		std::string full_path = util::MUSIC_DIRECTORY + song_name + ".mp3";
+		sf::Music song;
+		if (!song.openFromFile(full_path)) {
+			std::cerr << "Couldn't open " << full_path << "!\n";
+
+			return;
+		}
+		song.play();
+	}
+
+	inline void scroll_tiles(const int step) {
+		size_t tile_count = static_cast<size_t>(TileType::COUNT);
+
+		int new_index = static_cast<int>(current_tile) + step;
+		if (new_index < 0)
+			new_index += tile_count;
+		else if (new_index >= tile_count)
+			new_index -= tile_count;
+
+		current_tile = static_cast<TileType>(new_index);
 	}
 };
 

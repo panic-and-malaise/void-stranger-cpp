@@ -18,11 +18,6 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined -g")
-    set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address,undefined")
-endif()
-
 # Statically link libraries for Windows build)
 set(BUILD_SHARED_LIBS OFF)
 
@@ -53,8 +48,21 @@ target_link_libraries(
 	sfml-system
 	sfml-window
 	sfml-graphics
+	sfml-audio
 )
 target_compile_features(main PRIVATE cxx_std_20)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(main PRIVATE
+        -fsanitize=address,undefined
+        -g
+    )
+
+    target_link_options(main PRIVATE
+        -fsanitize=address,undefined
+    )
+endif()
+
 
 if(WIN32)
     add_custom_command(
