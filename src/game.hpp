@@ -360,6 +360,7 @@ private:
 		cursor.load_sprites();
 
 		player.load_sprites(sprites);
+		player.init_animations();
 		
 		for (int y = 0; y < 7; y++) {
 			std::vector<Tile> row;
@@ -405,6 +406,8 @@ private:
 				sounds.emplace(sound_name, sound);
 			}
 		}
+
+		player.init_sounds();
 	}
 
 	void init_animations(void) {
@@ -828,18 +831,17 @@ private:
 	inline void try_move_player(const math::Vec2i direction) {
 		math::Vec2i target = direction * util::TILE_SIZE * util::SPRITE_SCALE;
 		math::Vec2i target_world_pos = world_pos_to_grid(player.get_position() + target);
-		TileType target_tile = get_tile_type_at_pos(target_world_pos);
 
-		// std::cout << "(" << target_world_pos.x << ", " << target_world_pos.y << ") : " << static_cast<int>(target_tile) << '\n';
+		Tile target_tile = get_tile_at_pos(target_world_pos);
+		player.move(target, target_tile);
+	}
 
-		if (target_tile == TileType::FLOOR)
-			player.move(target);
-		else if (target_tile == TileType::GOAL)
-			player.move(target);
-		else {
-			std::cout << "Push!\n";
-			sounds["snd_push_small"].play();
-		}
+	inline Tile get_tile_at_pos(const math::Vec2i pos) {
+		// if (pos.y > tiles.size()) return NULL;
+		// if (pos.x >= tiles[pos.y].size()) return TileType::VOID;
+
+		Tile selected = tiles[pos.y][pos.x];
+		return selected;
 	}
 
 	inline TileType get_tile_type_at_pos(const math::Vec2i pos) {
