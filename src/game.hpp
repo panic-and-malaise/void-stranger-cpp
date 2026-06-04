@@ -33,12 +33,16 @@
 #include "cursor.hpp"
 #include "event_manager.hpp"
 #include "text_dynamic.hpp"
+#include "tile_definition.hpp"
 #include "typewriter.hpp"
 #include "util.hpp"
 #include "vec2i.hpp"
 #include "djikstra.hpp"
 #include "player.hpp"
 #include "tile.hpp"
+#include "tilemap.hpp"
+#include "tileset.hpp"
+#include "tilemap_renderer.hpp"
 
 namespace malaise {
 
@@ -48,6 +52,10 @@ public:
 		: rng(rd()) {
 
 		print_controls_help();
+		player.set_position({
+			5 * util::TILE_SIZE * util::SPRITE_SCALE,
+			7 * util::TILE_SIZE * util::SPRITE_SCALE
+		});
 
 		init_window();
 		init_simulation(argc, argv);
@@ -59,6 +67,8 @@ public:
 
 		init_sprites();
 		init_sounds();
+
+		init_tiles();
 
 		init_text_boxes();
 		// init_dynamic_text();
@@ -123,8 +133,8 @@ private:
 	sf::View ui_view;
 
 	// ------------ PROGRAM CONSTANTS ------------;
-	static constexpr size_t WINDOW_WIDTH = 832;
-	static constexpr size_t WINDOW_HEIGHT = 832;
+	static constexpr size_t WINDOW_WIDTH = 1152;
+	static constexpr size_t WINDOW_HEIGHT = 576;
 
 	static constexpr size_t REFRESH_RATE = 60;
 	static constexpr size_t PHYSICS_TICK_RATE = 10;
@@ -179,8 +189,13 @@ private:
 	color::ColorPicker color_picker{128, { WINDOW_WIDTH - 128, 128 }};
 
 	Player player;
+
 	Tile goal{ {0,0}, {}, TileType::VOID };
-	std::vector<std::vector<Tile>> tiles;
+
+	tile::TileMap tilemap{18, 9};
+	tile::TileSet tileset;
+	tile::TileMapRenderer tilemap_renderer;
+	TileType current_tile = TileType::FLOOR;
 
 	std::vector<math::Vec2i> path_to_goal;
 
@@ -362,30 +377,6 @@ private:
 		player.load_sprites(sprites);
 		player.init_animations();
 		
-		for (int y = 0; y < 7; y++) {
-			std::vector<Tile> row;
-			for (int x = 0; x < 8; x++) {
-				if (y < 5 and x == 1) {
-					Tile floor_tile({x, y}, sprites["spr_player_lookdown_finalmeeting_0"], TileType::VOID);
-					row.push_back(floor_tile);
-					continue;
-				}
-
-				bool is_last_row = y == 6;
-				Tile floor_tile({x, y}, is_last_row ? sprites["spr_floor_1"] : sprites["spr_floor_0"], is_last_row ? TileType::VOID : TileType::FLOOR);
-				row.push_back(floor_tile);
-			}
-			tiles.push_back(row);
-		}
-
-		Tile goal_tile = {
-			{2, 2},
-			sprites["spr_glassfloor_0"],
-			TileType::GOAL
-		};
-
-		tiles[2][2] = goal_tile;
-		goal = goal_tile;
 	}
 
 	void init_sounds(void) {
@@ -408,6 +399,20 @@ private:
 		}
 
 		player.init_sounds();
+	}
+
+	void init_tiles(void) {
+		tileset.init_tile_definitions(textures);
+
+		tilemap.set(2, 0, TileType::FLOOR);
+		tilemap.set(2, 1, TileType::FLOOR_UNDER);
+		tilemap.set(3, 0, TileType::GLASS);
+		tilemap.set(4, 0, TileType::GOAL);
+		tilemap.set(5, 0, TileType::WALL_CORNER_TOP_LEFT);
+		tilemap.set(6, 0, TileType::WALL_TOP);
+		tilemap.set(7, 0, TileType::WALL_CORNER_TOP_RIGHT);
+
+		tilemap.load_from_file("lvl_temp.txt");
 	}
 
 	void init_animations(void) {
@@ -561,12 +566,41 @@ private:
 	}
 
 	void handle_window_resize(const unsigned int width, const unsigned int height) {
-		ui_view.setSize(width, height);
-		ui_view.setCenter(width / 2.f, height / 2.f);
+		float window_ratio =
+        static_cast<float>(width) /
+        static_cast<float>(height);
 
-		float old_x = world_view.getSize().x; // Attempt to maintain camera center
-		world_view.setSize(width, height);
-		world_view.zoom(old_x / width);
+		float target_ratio =
+			WINDOW_WIDTH / (float)WINDOW_HEIGHT;
+
+		float size_x = 1.f;
+		float size_y = 1.f;
+		float pos_x = 0.f;
+		float pos_y = 0.f;
+
+		if (window_ratio > target_ratio)
+		{
+			// window too wide
+			size_x = target_ratio / window_ratio;
+			pos_x = (1.f - size_x) / 2.f;
+		}
+		else
+		{
+			// window too tall
+			size_y = window_ratio / target_ratio;
+			pos_y = (1.f - size_y) / 2.f;
+		}
+
+		world_view.setViewport(
+			sf::FloatRect(pos_x, pos_y, size_x, size_y)
+		);
+
+		// ui_view.setSize(width, height);
+		// ui_view.setCenter(width / 2.f, height / 2.f);
+
+		// float old_x = world_view.getSize().x; // Attempt to maintain camera center
+		// world_view.setSize(width, height);
+		// world_view.zoom(old_x / width);
 
 		color_picker.set_position({ static_cast<float>(window.getSize().x - 128.f), 128.f });
 	}
@@ -599,6 +633,9 @@ private:
 				static_cast<int32_t>(world_pos.x),
 				static_cast<int32_t>(world_pos.y)
 			};
+			math::Vec2i grid_pos = util::world_pos_to_grid(center);
+
+			tilemap.set(grid_pos.x, grid_pos.y, current_tile);
 
 			// if (pattern_selected)
 			// 	simulation.stamp_pattern(*pattern_selected, { center, color_picker.get_color_rgb() });
@@ -614,14 +651,9 @@ private:
 				static_cast<int32_t>(std::floor(world_pos.x)),
 				static_cast<int32_t>(std::floor(world_pos.y))
 			};
+			math::Vec2i grid_pos = util::world_pos_to_grid(center);
 
-			constexpr int ERASER_SIZE = 10;
-			for (int dy = -ERASER_SIZE / 2; dy <= ERASER_SIZE / 2; dy++) {
-				for (int dx = -ERASER_SIZE / 2; dx <= ERASER_SIZE / 2; dx++) {
-					math::Vec2i cell = { center.x + dx, center.y + dy };
-					// simulation.remove_cell_at(cell);
-				}
-			}
+			tilemap.set(grid_pos.x, grid_pos.y, TileType::VOID);
 		} else {
 			cursor.set_type(Cursor::Type::PATTERN);
 		}
@@ -638,8 +670,7 @@ private:
 				break;
 
 			case sf::Keyboard::Z:
-				// if (!physics_ticking)
-				// 	simulation.undo_stamp();
+				tilemap.export_to_file("lvl_temp.txt");
 				break;
 
 			case sf::Keyboard::C:
@@ -653,6 +684,10 @@ private:
 			default:
 				break;
 		}
+	}
+
+	void handle_scroll_tile_switching(const float scroll_delta) {
+		scroll_tiles(scroll_delta > 0.f ? -1 : 1);
 	}
 
 	void handle_sfml_events(void) {
@@ -693,9 +728,7 @@ private:
 					}
 					break;
 				case sf::Event::MouseWheelScrolled: {
-					// if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift))
-					// else
-					// 	handle_mouse_zoom(event.mouseWheelScroll.delta);
+					handle_scroll_tile_switching(event.mouseWheelScroll.delta);
 					break;
 				}
 				case sf::Event::MouseButtonPressed:
@@ -830,48 +863,47 @@ private:
 
 	inline void try_move_player(const math::Vec2i direction) {
 		math::Vec2i target = direction * util::TILE_SIZE * util::SPRITE_SCALE;
-		math::Vec2i target_world_pos = world_pos_to_grid(player.get_position() + target);
+		math::Vec2i target_grid_pos = util::world_pos_to_grid(player.get_position() + target);
 
-		Tile target_tile = get_tile_at_pos(target_world_pos);
+		tile::TileDefinition target_tile = tileset.definition_for(tilemap.get(target_grid_pos.x, target_grid_pos.y));
 		player.move(target, target_tile);
-	}
-
-	inline Tile get_tile_at_pos(const math::Vec2i pos) {
-		// if (pos.y > tiles.size()) return NULL;
-		// if (pos.x >= tiles[pos.y].size()) return TileType::VOID;
-
-		Tile selected = tiles[pos.y][pos.x];
-		return selected;
-	}
-
-	inline TileType get_tile_type_at_pos(const math::Vec2i pos) {
-		if (pos.y > tiles.size()) return TileType::VOID;
-		if (pos.x >= tiles[pos.y].size()) return TileType::VOID;
-
-		Tile selected = tiles[pos.y][pos.x];
-		return selected.get_type();
 	}
 
 	inline std::vector<math::Vec2i> path_through_tiles() {
 		std::vector<math::Vec2i> walkable_tiles;
-		walkable_tiles.reserve(tiles.size());
+		walkable_tiles.reserve(tilemap.get_size());
 
-		for (auto &row : tiles) {
-			for (auto &tile : row) {
-				if (tile.get_type() == TileType::FLOOR)
-					walkable_tiles.push_back(tile.get_position());
+		math::Vec2i goal{};
+
+		for (int32_t y = 0; y < tilemap.get_height(); y++) {
+			for (int32_t x = 0; x < tilemap.get_width(); x++) {
+				const TileType tile = tilemap.get(x, y);
+				tile::TileDefinition definition = tileset.definition_for(tile);
+				math::Vec2i position = {x, y};
+
+				if (!definition.is_collidable and !definition.is_fall)
+					walkable_tiles.push_back(position);
+				if (definition.is_stairs)
+					goal = position;
 			}
 		}
 
-		return malaise::algorithm::djikstras_algorithm(walkable_tiles, player.get_position_grid(), goal.get_position());
+		return malaise::algorithm::djikstras_algorithm(walkable_tiles, player.get_position_grid(), goal);
 	}
 
 	inline void draw_tiles() {
-		for (auto &row : tiles) {
-			for (auto &tile : row) {
-				tile.draw(window);
-			}
-		}
+		tilemap_renderer.draw(window, tilemap, tileset);
+
+		// painting tile
+		sf::Sprite sprite;
+		sprite.setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
+
+		const sf::Texture *texture = tileset.texture(current_tile);
+		if (!texture) return;
+		sprite.setTexture(*texture);
+		sprite.setTextureRect(tileset.rect_for(current_tile));
+		sprite.setPosition(0, 512);
+		window.draw(sprite);
 	}
 
 	inline void step_towards_goal() {
@@ -892,6 +924,18 @@ private:
 			return;
 		}
 		song.play();
+	}
+
+	inline void scroll_tiles(const int step) {
+		size_t tile_count = static_cast<size_t>(TileType::COUNT) - 1;
+
+		int new_index = static_cast<int>(current_tile) + step;
+		if (new_index < 0)
+			new_index += tile_count;
+		else if (new_index > tile_count)
+			new_index -= tile_count;
+
+		current_tile = static_cast<TileType>(new_index);
 	}
 };
 

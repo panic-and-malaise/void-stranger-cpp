@@ -11,10 +11,22 @@ namespace malaise {
 
 enum class TileType {
 	FLOOR = 0,
-	GOAL,
-	WALL,
-	VOID,
+	FLOOR_UNDER = 1,
+	GOAL = 2,
+	VOID = 3,
+
+	WALL = 4,
+	WALL_CORNER_TOP_LEFT = 5,
+	WALL_TOP = 6,
+	WALL_CORNER_TOP_RIGHT = 7,
+
+	GLASS = 8,
+	BOUNDS = 9,
+
+	COUNT
 };
+
+constexpr size_t TileTypeCount = static_cast<size_t>(TileType::COUNT);
 
 class Tile {
 public:

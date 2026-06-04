@@ -15,6 +15,7 @@
 #include <SFML/Graphics/Sprite.hpp>
 
 #include "tile.hpp"
+#include "tileset.hpp"
 #include "util.hpp"
 #include "vec2i.hpp"
 
@@ -49,6 +50,8 @@ enum class Facing {
 class Player {
 public:
 	Player() = default;
+
+	Player(const math::Vec2i pos) : position(std::move(pos)) {}
 
 	Player(const std::unordered_map<std::string, sf::Sprite> &sprites_) {
 		load_sprites(sprites_);
@@ -203,7 +206,7 @@ public:
 		sprite = &sprites[next_frame.str()];
 	}
 
-	void move(const math::Vec2i pos, Tile target_tile) {
+	void move(const math::Vec2i pos, tile::TileDefinition target_tile) {
 		math::Vec2i target = position + pos;
 
 		if (pos.x > 0)
@@ -233,7 +236,7 @@ public:
 		}
 
 		// Can't move, push against wall
-		if (target_tile.get_type() != TileType::FLOOR) {
+		if (target_tile.is_collidable) {
 			sounds["snd_push_small"].play();
 
 			default_animation = current_animation;
@@ -253,9 +256,12 @@ public:
 					break;
 				default:
 				break;
-		}
+			}
 			return;
 		}
+
+		if (target_tile.is_fall)
+			play_animation("fall");
 
 		set_position(target);
 	}

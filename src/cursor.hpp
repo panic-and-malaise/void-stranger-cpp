@@ -34,16 +34,19 @@ public:
 		paint_cursor_texture.loadFromFile(util::RESOURCE_DIRECTORY + "sprites/paint_cursor.png");
 		textures.emplace(Cursor::Type::PAINT_BRUSH, paint_cursor_texture);
 		sprites.emplace(Cursor::Type::PAINT_BRUSH, textures.at(Cursor::Type::PAINT_BRUSH));
+		sprites.at(Cursor::Type::PAINT_BRUSH).setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
 
 		sf::Texture eraser_texture;
 		eraser_texture.loadFromFile(util::RESOURCE_DIRECTORY + "sprites/paint_eraser.png");
 		textures.emplace(Cursor::Type::ERASER, eraser_texture);
 		sprites.emplace(Cursor::Type::ERASER, textures.at(Cursor::Type::ERASER));
+		sprites.at(Cursor::Type::ERASER).setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
 
 		sf::Texture eyedropper_texture;
 		eyedropper_texture.loadFromFile(util::RESOURCE_DIRECTORY + "sprites/paint_eyedropper.png");
 		textures.emplace(Cursor::Type::EYEDROPPER, eyedropper_texture);
 		sprites.emplace(Cursor::Type::EYEDROPPER, textures.at(Cursor::Type::EYEDROPPER));
+		sprites.at(Cursor::Type::EYEDROPPER).setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
 	}
 
 	void set_type(const Cursor::Type cursor_type) {
