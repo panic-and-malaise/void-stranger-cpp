@@ -40,6 +40,8 @@ public:
 			return;
 		}
 
+		name = std::filesystem::path(filename).filename().replace_extension("").string();
+
 		tiles.clear();
 
 		std::string temp;
@@ -60,7 +62,7 @@ public:
 		}
 	}
 
-	void export_to_file(const std::string &filename) {
+	void export_to_file(const std::string &filename, const math::Vec2i player_pos = {0, 0}) {
 		util::FileWrapper file(util::LEVEL_DIRECTORY + filename, std::ios::out);
 
 		if (!file) {
@@ -69,7 +71,12 @@ public:
 		}
 
 		file.write_line("size " + std::to_string(width) + " " + std::to_string(height));
-		file.write_line("player " + std::to_string(player_start_pos.x) + " " + std::to_string(player_start_pos.y));
+
+		if (player_pos.x and player_pos.y)
+			file.write_line("player " + std::to_string(player_pos.x) + " " + std::to_string(player_pos.y));
+		else
+			file.write_line("player " + std::to_string(player_start_pos.x) + " " + std::to_string(player_start_pos.y));
+
 		file.write_line("level_next " + level_next);
 
 		for (int32_t y = 0; y < get_height(); y++) {
@@ -121,6 +128,10 @@ public:
 	std::string get_level_next() const {
 		return level_next;
 	}
+
+	std::string get_name() const {
+		return name;
+	}
 private:
 	bool is_in_bounds(const size_t x, const size_t y) const {
 		return x >= 0 && x < width and
@@ -130,6 +141,7 @@ private:
 	size_t width  = 0;
 	size_t height = 0;
 
+	std::string name{};
 	std::vector<TileType> tiles;
 
 	math::Vec2i player_start_pos{};

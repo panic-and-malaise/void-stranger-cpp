@@ -42,12 +42,20 @@ public:
 				sprite.setOrigin(0, 0);
 				sprite.setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
 
-				if (definition.is_flipped) {
+				if (definition.is_flipped_horizontal) {
 					sprite.setOrigin(
 						definition.texture_rect.width,
+						sprite.getOrigin().y
+					);
+					sprite.scale(-1, 1);
+				}
+
+				if (definition.is_flipped_vertical) {
+					sprite.setOrigin(
+						sprite.getOrigin().x,
 						definition.texture_rect.height
 					);
-					sprite.scale(-1, -1);
+					sprite.scale(1, -1);
 				}
 
 				math::Vec2i position = util::grid_pos_to_world(x, y);

@@ -1,7 +1,6 @@
 #ifndef MALAISE_GAME_HPP
 #define MALAISE_GAME_HPP
 
-#include <SFML/System/Vector2.hpp>
 #include <cstdint>
 #include <ctime>
 #include <filesystem>
@@ -26,6 +25,7 @@
 #include <SFML/Audio/Sound.hpp>
 #include <SFML/Audio/Music.hpp>
 #include <SFML/Audio/SoundBuffer.hpp>
+#include <SFML/System/Vector2.hpp>
 
 #include "animation.hpp"
 #include "animation_matrix.hpp"
@@ -43,6 +43,7 @@
 #include "tilemap.hpp"
 #include "tileset.hpp"
 #include "tilemap_renderer.hpp"
+#include "iris_transition.hpp"
 
 namespace malaise {
 
@@ -85,7 +86,12 @@ public:
 
 		sf::Music extended_encore;
 		if (extended_encore.openFromFile(util::MUSIC_DIRECTORY + "mus_extended_encore.mp3"))
-			extended_encore.play();
+			event_manager.emplace_event(2.f, [&]() {
+				extended_encore.play();
+				player.reset_animation_timer();
+			});
+
+		player.play_fall_animation();
 
 		previous_time = render_clock.getElapsedTime();
 
@@ -133,8 +139,8 @@ private:
 	sf::View ui_view;
 
 	// ------------ PROGRAM CONSTANTS ------------;
-	static constexpr size_t WINDOW_WIDTH = 1152;
-	static constexpr size_t WINDOW_HEIGHT = 576;
+	static constexpr size_t WINDOW_WIDTH = 672;
+	static constexpr size_t WINDOW_HEIGHT = 432;
 
 	static constexpr size_t REFRESH_RATE = 60;
 	static constexpr size_t PHYSICS_TICK_RATE = 10;
@@ -195,6 +201,8 @@ private:
 	tile::TileSet tileset;
 	tile::TileMapRenderer tilemap_renderer;
 	TileType current_tile = TileType::FLOOR;
+
+	animation::SquareIrisTransition room_transition;
 
 	std::vector<math::Vec2i> path_to_goal;
 
@@ -411,7 +419,7 @@ private:
 		tilemap.set(6, 0, TileType::WALL_TOP);
 		tilemap.set(7, 0, TileType::WALL_CORNER_TOP_RIGHT);
 
-		tilemap.load_from_file("lvl_temp.txt");
+		tilemap.load_from_file("br_002.txt");
 		player.set_position_grid(tilemap.get_player_start_pos());
 	}
 
@@ -486,6 +494,8 @@ private:
 		// 	pattern_selected->render_pattern(window, hover_world_pos);
 
 		cursor.render(window, util::float_vector_to_integer(hover_world_pos));
+
+		room_transition.draw(window);
 	}
 
 	void draw_world_elements(void) {
@@ -512,6 +522,7 @@ private:
 
 	void update_animations(const float delta_time) {
 		player.tick_animation(delta_time);
+		room_transition.update(delta_time);
 
 		for (auto &animation_queue : animation_matrix.get_animations()) {
 			if (animation_queue.front().is_finished()) // Play animations from the queue in sequence, popping when finished
@@ -655,7 +666,7 @@ private:
 				break;
 
 			case sf::Keyboard::Z:
-				tilemap.export_to_file("lvl_temp.txt");
+				tilemap.export_to_file(tilemap.get_name() + ".txt", player.get_position_grid());
 				break;
 
 			case sf::Keyboard::X: {
@@ -849,8 +860,26 @@ private:
 		tile::TileDefinition target_tile = tileset.definition_for(tilemap.get(target_grid_pos.x, target_grid_pos.y));
 		player.move(target, target_tile);
 		if (target_tile.is_stairs and not tilemap.get_level_next().empty()) {
-			tilemap.load_from_file(tilemap.get_level_next());
-			player.set_position_grid(tilemap.get_player_start_pos());
+			sounds["snd_stairs"].play();
+			room_transition.start_close({
+				static_cast<float>(player.get_position().x) + 24.f,
+				static_cast<float>(player.get_position().y) + 24.f
+			});
+
+			event_manager.emplace_event(1.3f, [&]() {
+				tilemap.load_from_file(tilemap.get_level_next());
+				player.set_position_grid(tilemap.get_player_start_pos());
+				player.play_animation("blink");
+
+				room_transition.start_open({
+					static_cast<float>(player.get_position().x) + 24.f,
+					static_cast<float>(player.get_position().y) + 24.f
+				});
+			});
+
+			event_manager.emplace_event(3.f, [&]() {
+				player.play_animation("idle_down");
+			});
 		}
 	}
 
@@ -887,7 +916,7 @@ private:
 		if (!texture) return;
 		sprite.setTexture(*texture);
 		sprite.setTextureRect(tileset.rect_for(current_tile));
-		sprite.setPosition(0, 512);
+		sprite.setPosition(0, WINDOW_HEIGHT - util::TILE_SIZE * util::SPRITE_SCALE);
 		window.draw(sprite);
 	}
 
@@ -900,7 +929,7 @@ private:
 		try_move_player(target);
 	}
 
-	inline void play_song(const std::string &song_name) {
+	void play_song(const std::string &song_name) {
 		std::string full_path = util::MUSIC_DIRECTORY + song_name + ".mp3";
 		sf::Music song;
 		if (!song.openFromFile(full_path)) {

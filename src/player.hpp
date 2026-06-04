@@ -3,6 +3,8 @@
 
 #include <SFML/Audio/Sound.hpp>
 #include <SFML/Audio/SoundBuffer.hpp>
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <iostream>
 #include <sstream>
@@ -150,6 +152,34 @@ public:
 		animations.emplace("push_left", std::move(push_left));
 		animations.emplace("push_right", std::move(push_right));
 
+		SpriteAnimation enter;
+
+		enter.base_name = "spr_player_enter";
+		enter.frame_count = 6;
+		enter.frame_length = PUSH_LENGTH;
+		enter.load_frames_by_name(sprites);
+
+		SpriteAnimation drop;
+
+		drop.base_name = "spr_player_drop";
+		drop.frame_count = 1;
+		drop.frame_length = PUSH_LENGTH;
+		drop.loops = true;
+		drop.frames.push_back(&sprites.at("spr_player_drop_1"));
+
+		animations.emplace("enter", enter);
+		animations.emplace("drop", drop);
+
+		SpriteAnimation blink;
+
+		blink.base_name = "spr_player_gblink_d";
+		blink.frame_count = 4;
+		blink.frame_length = 0.1f;
+		blink.loops = true;
+		blink.load_frames_by_name(sprites);
+
+		animations.emplace("blink", blink);
+
 		play_animation("idle_down");
 	}
 
@@ -175,8 +205,15 @@ public:
 
 	void draw(sf::RenderTarget &target) {
 		if (sprite) {
-			sprite->setPosition(position.x, position.y);
+			sprite->setPosition(
+				position.x + render_offset.x,
+				position.y + render_offset.y
+			);
+
 			target.draw(*sprite);
+
+			if (falling_in)
+				target.draw(sprites.at("spr_player_drop_0"));
 		}
 	}
 
@@ -205,9 +242,24 @@ public:
 
 	void update_sprite() {
 		std::stringstream next_frame{};
-		next_frame << trunc_sprite_name() << "_" << animation_step;
+		next_frame << current_sprite_name << "_" << animation_step;
 
 		sprite = &sprites[next_frame.str()];
+	}
+
+	void play_fall_animation() {
+		sounds["snd_player_fall"].play();
+		sprites.at("spr_player_drop_0").setPosition(
+			position.x + render_offset.x,
+			position.y + render_offset.y
+		);
+
+		falling_in = true;
+		play_animation("drop");
+	}
+
+	void reset_animation_timer() {
+		animation_timer = 0.f;
 	}
 
 	void move(const math::Vec2i pos, tile::TileDefinition target_tile) {
@@ -273,6 +325,23 @@ public:
 	void tick_animation(const float delta) {
 		if (!current_animation) return;
 
+		if (falling_in) {
+			fall_timer += delta;
+
+			static constexpr float FALL_DURATION = 1.0f;
+
+			float t = std::min(fall_timer / FALL_DURATION, 1.f);
+
+			render_offset.y = std::lerp(-position.y - 96.f, 0, t);
+
+			if (t >= 1.f) {
+				falling_in = false;
+				play_animation("enter");
+			}
+
+			return;
+		}
+
 		animation_timer += delta;
 
 		if (!current_animation->uses_global_time) {
@@ -316,6 +385,7 @@ public:
 	}
 private:
 	math::Vec2i position{};
+	math::Vec2i render_offset{};
 	Facing facing = Facing::DOWN;
 
 	sf::Sprite *sprite = nullptr;
@@ -338,9 +408,8 @@ private:
 	size_t current_frame = 0;
 	float animation_timer = 0.f;
 
-	inline std::string trunc_sprite_name() {
-		return current_sprite_name.substr(0, current_sprite_name.length());
-	}
+	bool falling_in = true;
+	float fall_timer = 0.0f;
 };
 
 }

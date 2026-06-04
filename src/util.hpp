@@ -24,7 +24,7 @@ const std::string MUSIC_DIRECTORY = RESOURCE_DIRECTORY + "music/";
 const std::string SOUND_DIRECTORY = RESOURCE_DIRECTORY + "sounds/";
 const std::string LEVEL_DIRECTORY = RESOURCE_DIRECTORY + "levels/";
 
-static constexpr size_t SPRITE_SCALE = 4;
+static constexpr size_t SPRITE_SCALE = 3;
 static constexpr size_t TILE_SIZE = 16;
 
 inline constexpr float PI = 3.14159265358979323846;

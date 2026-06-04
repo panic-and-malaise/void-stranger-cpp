@@ -9,7 +9,8 @@ namespace malaise::tile {
 struct TileDefinition {
 	const sf::Texture *texture = nullptr;
 	sf::IntRect texture_rect;
-	bool is_flipped = false;
+	bool is_flipped_horizontal = false;
+	bool is_flipped_vertical = false;
 	bool is_collidable = false;
 	bool is_fall = false;
 	bool is_stairs = false;
