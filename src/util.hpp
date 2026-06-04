@@ -18,6 +18,8 @@ namespace malaise::util {
 
 const std::string RESOURCE_DIRECTORY = std::filesystem::current_path().string() + "/resources/";
 const std::string SPRITE_DIRECTORY = RESOURCE_DIRECTORY + "sprites/";
+const std::string MUSIC_DIRECTORY = RESOURCE_DIRECTORY + "music/";
+const std::string SOUND_DIRECTORY = RESOURCE_DIRECTORY + "sounds/";
 
 static constexpr size_t SPRITE_SCALE = 4;
 static constexpr size_t TILE_SIZE = 16;

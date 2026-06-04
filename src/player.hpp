@@ -1,6 +1,7 @@
 #ifndef MALAISE_PLAYER_HPP
 #define MALAISE_PLAYER_HPP
 
+#include <cstddef>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -13,6 +14,13 @@
 #include "vec2i.hpp"
 
 namespace malaise {
+
+struct SpriteAnimation {
+	std::string base_name;
+	size_t frame_count = 0;
+	float frame_length = 0.f;
+	bool loops = false;
+};
 
 class Player {
 public:
@@ -106,7 +114,13 @@ private:
 	size_t animation_step = 0;
 	size_t animation_length = 2;
 	float tick_counter = 0.0f;
-	static constexpr float FRAME_LENGTH = 0.5f;
+	static constexpr float FRAME_LENGTH = 60.f / 84.f; // synced to BPM for funsies
+
+	const SpriteAnimation *current_animation = nullptr;
+	const SpriteAnimation *default_animation = nullptr;
+
+	size_t current_frame = 0;
+	float animation_timer = 0.f;
 
 	inline std::string trunc_sprite_name() {
 		return current_sprite_name.substr(0, current_sprite_name.length());

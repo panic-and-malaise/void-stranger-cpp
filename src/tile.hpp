@@ -11,6 +11,7 @@ namespace malaise {
 
 enum class TileType {
 	FLOOR = 0,
+	GOAL,
 	WALL,
 	VOID,
 };

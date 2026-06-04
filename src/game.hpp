@@ -22,6 +22,9 @@
 #include <SFML/Window/Keyboard.hpp>
 #include <SFML/Graphics/Color.hpp>
 #include <SFML/Graphics/Texture.hpp>
+#include <SFML/Audio/Sound.hpp>
+#include <SFML/Audio/Music.hpp>
+#include <SFML/Audio/SoundBuffer.hpp>
 
 #include "animation.hpp"
 #include "animation_matrix.hpp"
@@ -53,7 +56,9 @@ public:
 
 		init_fonts();
 		init_cursor();
+
 		init_sprites();
+		init_sounds();
 
 		init_text_boxes();
 		// init_dynamic_text();
@@ -66,18 +71,11 @@ public:
 	// --------------- PUBLIC METHODS ---------------;
 
 	int main_loop(void) {
-		// Testing
-		std::vector<math::Vec2i> graph = {
-			{0, 0}, {2, 0}, {3, 0},
-			{0, 1}, {2, 1}, {3, 1},
-			{0, 2}, {2, 2}, {3, 2},
-			{0, 3}, {1, 3}, {2, 3}, {3, 3},
+		// play_song("mus_extended_encore");
 
-		};
-		std::vector<math::Vec2i> path = malaise::algorithm::djikstras_algorithm(graph, {0, 0}, {3, 0});
-		for (auto &node : path) {
-			std::cout << '(' << node.x << ", " << node.y << ")\n";
-		}
+		sf::Music extended_encore;
+		if (extended_encore.openFromFile(util::MUSIC_DIRECTORY + "mus_extended_encore.mp3"))
+			extended_encore.play();
 
 		previous_time = render_clock.getElapsedTime();
 
@@ -129,7 +127,7 @@ private:
 	static constexpr size_t WINDOW_HEIGHT = 832;
 
 	static constexpr size_t REFRESH_RATE = 60;
-	static constexpr size_t PHYSICS_TICK_RATE = 20;
+	static constexpr size_t PHYSICS_TICK_RATE = 10;
 
 	const std::string WINDOW_TITLE = "SPA-DZ-02";
 
@@ -173,12 +171,18 @@ private:
 	std::unordered_map<std::string, sf::Texture> textures;
 	std::unordered_map<std::string, sf::Sprite> sprites;
 
+	std::unordered_map<std::string, sf::SoundBuffer> sound_buffers;
+	std::unordered_map<std::string, sf::Sound> sounds;
+
 	// ---------- CURRENT POINTERS ----------;
 	malaise::Cursor cursor;
 	color::ColorPicker color_picker{128, { WINDOW_WIDTH - 128, 128 }};
 
 	Player player;
+	Tile goal{ {0,0}, {}, TileType::VOID };
 	std::vector<std::vector<Tile>> tiles;
+
+	std::vector<math::Vec2i> path_to_goal;
 
 	// --------------- PRIVATE METHODS ---------------;
 
@@ -347,8 +351,6 @@ private:
 				sprites.emplace(sprite_name, textures.at(sprite_name));
 				sprites[sprite_name].setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
 
-				// TODO: Set default scale and parameters based on final screen size
-
 				// auto &sprite = sprites.at(filename);
 				// sprite.setPosition(WINDOW_WIDTH / 2.f - 128, WINDOW_HEIGHT / 2.f - 128);
 				// sprite.setColor(sf::Color(255, 255, 255, 0));
@@ -361,13 +363,47 @@ private:
 		
 		for (int y = 0; y < 7; y++) {
 			std::vector<Tile> row;
-			for (int x = 0; x < 4; x++) {
+			for (int x = 0; x < 8; x++) {
+				if (y < 5 and x == 1) {
+					Tile floor_tile({x, y}, sprites["spr_player_lookdown_finalmeeting_0"], TileType::VOID);
+					row.push_back(floor_tile);
+					continue;
+				}
 
 				bool is_last_row = y == 6;
 				Tile floor_tile({x, y}, is_last_row ? sprites["spr_floor_1"] : sprites["spr_floor_0"], is_last_row ? TileType::VOID : TileType::FLOOR);
 				row.push_back(floor_tile);
 			}
 			tiles.push_back(row);
+		}
+
+		Tile goal_tile = {
+			{2, 2},
+			sprites["spr_glassfloor_0"],
+			TileType::GOAL
+		};
+
+		tiles[2][2] = goal_tile;
+		goal = goal_tile;
+	}
+
+	void init_sounds(void) {
+		for (const auto &directory : std::filesystem::recursive_directory_iterator(util::SOUND_DIRECTORY)) {
+			std::string path = directory.path().string();
+			std::string filename = std::filesystem::path(directory).filename().string();
+
+			if (filename.empty() or filename.substr(0, 3) != "snd") continue;
+
+			std::string sound_name = std::filesystem::path(directory).filename().replace_extension("").string();
+			sf::SoundBuffer buffer;
+
+			if (buffer.loadFromFile(path)) {
+				sound_buffers.emplace(sound_name, buffer);
+				sf::Sound sound;
+				sound.setVolume(50.f);
+				sound.setBuffer(sound_buffers[sound_name]);
+				sounds.emplace(sound_name, sound);
+			}
 		}
 	}
 
@@ -408,6 +444,7 @@ private:
 	void update_simulation() {
 		while (physics_accumulator >= physics_timestep) { // Limit framerate to physics tickrate
 			if (physics_ticking) {
+				step_towards_goal();
 				// simulation.step();
 			}
 			physics_accumulator -= physics_timestep;
@@ -606,10 +643,10 @@ private:
 				color_picker.is_hidden() ? color_picker.unhide() : color_picker.hide();
 				break;
 
-			case sf::Keyboard::X:
-				color_picker.swap_colors();
+			case sf::Keyboard::X: {
+				path_to_goal = path_through_tiles();
 				break;
-
+			}
 			default:
 				break;
 		}
@@ -797,6 +834,12 @@ private:
 
 		if (target_tile == TileType::FLOOR)
 			player.move(target);
+		else if (target_tile == TileType::GOAL)
+			player.move(target);
+		else {
+			std::cout << "Push!\n";
+			sounds["snd_push_small"].play();
+		}
 	}
 
 	inline TileType get_tile_type_at_pos(const math::Vec2i pos) {
@@ -818,7 +861,7 @@ private:
 			}
 		}
 
-		return malaise::algorithm::djikstras_algorithm(walkable_tiles, player.get_position_grid(), {14, 0});
+		return malaise::algorithm::djikstras_algorithm(walkable_tiles, player.get_position_grid(), goal.get_position());
 	}
 
 	inline void draw_tiles() {
@@ -827,6 +870,26 @@ private:
 				tile.draw(window);
 			}
 		}
+	}
+
+	inline void step_towards_goal() {
+		if (path_to_goal.empty()) return;
+		auto next_step = path_to_goal.front();
+		path_to_goal.erase(path_to_goal.begin());
+		math::Vec2i target = next_step - player.get_position_grid();
+		std::cout << "(" << next_step.x << ", " << next_step.y << ") | (" << target.x << ", " << target.y << ")\n";
+		try_move_player(target);
+	}
+
+	inline void play_song(const std::string &song_name) {
+		std::string full_path = util::MUSIC_DIRECTORY + song_name + ".mp3";
+		sf::Music song;
+		if (!song.openFromFile(full_path)) {
+			std::cerr << "Couldn't open " << full_path << "!\n";
+
+			return;
+		}
+		song.play();
 	}
 };
 
