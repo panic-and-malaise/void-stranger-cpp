@@ -10,6 +10,7 @@
 #include "file_wrapper.hpp"
 #include "tile.hpp"
 #include "util.hpp"
+#include "vec2i.hpp"
 
 namespace malaise::tile {
 
@@ -41,7 +42,11 @@ public:
 
 		tiles.clear();
 
-		file.get() >> width >> height;
+		std::string temp;
+
+		file.get() >> temp >> width >> height;
+		file.get() >> temp >> player_start_pos.x >> player_start_pos.y;
+		file.get() >> temp >> level_next;
 
 		char next_tile;
 		while (file.get() >> next_tile) {
@@ -63,14 +68,16 @@ public:
 			return;
 		}
 
-		file.write_line(std::to_string(width) + " " + std::to_string(height));
+		file.write_line("size " + std::to_string(width) + " " + std::to_string(height));
+		file.write_line("player " + std::to_string(player_start_pos.x) + " " + std::to_string(player_start_pos.y));
+		file.write_line("level_next " + level_next);
+
 		for (int32_t y = 0; y < get_height(); y++) {
 			std::string line = "";
 			for (int32_t x = 0; x < get_width(); x++) {
 				TileType tile = get(x, y);
 				if (tile == TileType::BOUNDS) {
 					line += '#';
-					line += ' ';
 					continue;
 				}
 				line += static_cast<size_t>(tile) + '0';
@@ -106,6 +113,14 @@ public:
 	size_t get_size() const {
 		return width * height;
 	}
+
+	math::Vec2i get_player_start_pos() const {
+		return player_start_pos;
+	}
+
+	std::string get_level_next() const {
+		return level_next;
+	}
 private:
 	bool is_in_bounds(const size_t x, const size_t y) const {
 		return x >= 0 && x < width and
@@ -114,7 +129,11 @@ private:
 
 	size_t width  = 0;
 	size_t height = 0;
+
 	std::vector<TileType> tiles;
+
+	math::Vec2i player_start_pos{};
+	std::string level_next{};
 };
 
 }

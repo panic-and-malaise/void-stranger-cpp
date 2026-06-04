@@ -97,12 +97,7 @@ public:
 				sprite.setPosition({ centered_pos.x - 1.5f, centered_pos.y - 12.5f });
 				sprite.setColor(sf::Color(255, 255, 255, 127));
 
-				sf::RectangleShape hovered_color_rect({8, 4});
-				hovered_color_rect.setFillColor(hover_color);
-				hovered_color_rect.setPosition({ centered_pos.x + 8.f, centered_pos.y + 2.f });
-
 				target.draw(sprite);
-				target.draw(hovered_color_rect);
 
 				break;
 			}

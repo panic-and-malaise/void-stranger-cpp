@@ -1,6 +1,7 @@
 #ifndef MALAISE_GAME_HPP
 #define MALAISE_GAME_HPP
 
+#include <SFML/System/Vector2.hpp>
 #include <cstdint>
 #include <ctime>
 #include <filesystem>
@@ -29,7 +30,6 @@
 #include "animation.hpp"
 #include "animation_matrix.hpp"
 #include "button.hpp"
-#include "color_picker.hpp"
 #include "cursor.hpp"
 #include "event_manager.hpp"
 #include "text_dynamic.hpp"
@@ -186,7 +186,6 @@ private:
 
 	// ---------- CURRENT POINTERS ----------;
 	malaise::Cursor cursor;
-	color::ColorPicker color_picker{128, { WINDOW_WIDTH - 128, 128 }};
 
 	Player player;
 
@@ -413,6 +412,7 @@ private:
 		tilemap.set(7, 0, TileType::WALL_CORNER_TOP_RIGHT);
 
 		tilemap.load_from_file("lvl_temp.txt");
+		player.set_position_grid(tilemap.get_player_start_pos());
 	}
 
 	void init_animations(void) {
@@ -473,8 +473,6 @@ private:
 		for (auto &txt : dynamic_text_objects) {
 			txt.draw(window);
 		}
-
-		color_picker.draw(window);
 
 		if (!scrollable_text_objects.empty())
 			scrollable_text_objects.front()->draw(window);
@@ -601,8 +599,6 @@ private:
 		// float old_x = world_view.getSize().x; // Attempt to maintain camera center
 		// world_view.setSize(width, height);
 		// world_view.zoom(old_x / width);
-
-		color_picker.set_position({ static_cast<float>(window.getSize().x - 128.f), 128.f });
 	}
 
 	void handle_realtime_inputs(void) {
@@ -611,23 +607,17 @@ private:
 		// -------------------- SIMULATION TOGGLE --------------------;
 		physics_ticking = sf::Keyboard::isKeyPressed(sf::Keyboard::Space);
 
-		if (!color_picker.is_hidden() && sf::Keyboard::isKeyPressed(sf::Keyboard::LControl)) {
+		if (sf::Keyboard::isKeyPressed(sf::Keyboard::LControl)) {
 			cursor.set_type(Cursor::Type::EYEDROPPER);
 			return;
 		}
+
+		cursor.set_type(Cursor::Type::PAINT_BRUSH);
 
 		// -------------------- CELL PAINTING --------------------;
 		if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
 			sf::Vector2i pixel_pos = sf::Mouse::getPosition(window);
 			sf::Vector2f world_pos = window.mapPixelToCoords(pixel_pos);
-
-			cursor.set_type(Cursor::Type::PAINT_BRUSH);
-
-			// Don't paint if the color picker is clicked
-			if (color_picker.mouse_set_saturation_value(util::integer_vector_to_float(pixel_pos)))
-				return;
-			else if (color_picker.mouse_set_hue(util::integer_vector_to_float(pixel_pos)))
-				return;
 
 			math::Vec2i center = {
 				static_cast<int32_t>(world_pos.x),
@@ -636,9 +626,6 @@ private:
 			math::Vec2i grid_pos = util::world_pos_to_grid(center);
 
 			tilemap.set(grid_pos.x, grid_pos.y, current_tile);
-
-			// if (pattern_selected)
-			// 	simulation.stamp_pattern(*pattern_selected, { center, color_picker.get_color_rgb() });
 
 		// -------------------- CELL ERASING --------------------;
 		} else if (!physics_ticking && sf::Mouse::isButtonPressed(sf::Mouse::Right)) {
@@ -654,8 +641,6 @@ private:
 			math::Vec2i grid_pos = util::world_pos_to_grid(center);
 
 			tilemap.set(grid_pos.x, grid_pos.y, TileType::VOID);
-		} else {
-			cursor.set_type(Cursor::Type::PATTERN);
 		}
 	}
 	
@@ -673,10 +658,6 @@ private:
 				tilemap.export_to_file("lvl_temp.txt");
 				break;
 
-			case sf::Keyboard::C:
-				color_picker.is_hidden() ? color_picker.unhide() : color_picker.hide();
-				break;
-
 			case sf::Keyboard::X: {
 				path_to_goal = path_through_tiles();
 				break;
@@ -687,7 +668,7 @@ private:
 	}
 
 	void handle_scroll_tile_switching(const float scroll_delta) {
-		scroll_tiles(scroll_delta > 0.f ? -1 : 1);
+		scroll_tiles(scroll_delta > 0.f ? 1 : -1);
 	}
 
 	void handle_sfml_events(void) {
@@ -743,11 +724,11 @@ private:
 
 							// Eyedropper logic
 							if (cursor.get_type() == Cursor::Type::EYEDROPPER) {
-								sf::Vector2i pixel_pos = sf::Mouse::getPosition(window);
-								sf::Color hovered_color = get_screen_pixel(pixel_pos);
+								sf::Vector2i hover_mouse_pos = sf::Mouse::getPosition(window);
+								sf::Vector2f hover_world_pos = window.mapPixelToCoords(hover_mouse_pos);
+								math::Vec2i hover_grid_pos = util::world_pos_to_grid(hover_world_pos);
 
-								cursor.set_hovered_color(hovered_color);
-								color_picker.set_current_color(hovered_color);
+								current_tile = tilemap.get(hover_grid_pos.x, hover_grid_pos.y);
 							}
 
 							break;
@@ -867,6 +848,10 @@ private:
 
 		tile::TileDefinition target_tile = tileset.definition_for(tilemap.get(target_grid_pos.x, target_grid_pos.y));
 		player.move(target, target_tile);
+		if (target_tile.is_stairs and not tilemap.get_level_next().empty()) {
+			tilemap.load_from_file(tilemap.get_level_next());
+			player.set_position_grid(tilemap.get_player_start_pos());
+		}
 	}
 
 	inline std::vector<math::Vec2i> path_through_tiles() {
@@ -927,12 +912,12 @@ private:
 	}
 
 	inline void scroll_tiles(const int step) {
-		size_t tile_count = static_cast<size_t>(TileType::COUNT) - 1;
+		size_t tile_count = static_cast<size_t>(TileType::COUNT);
 
 		int new_index = static_cast<int>(current_tile) + step;
 		if (new_index < 0)
 			new_index += tile_count;
-		else if (new_index > tile_count)
+		else if (new_index >= tile_count)
 			new_index -= tile_count;
 
 		current_tile = static_cast<TileType>(new_index);

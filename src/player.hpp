@@ -194,6 +194,10 @@ public:
 		position = pos;
 	}
 
+	void set_position_grid(const math::Vec2i pos) {
+		position = util::grid_pos_to_world(pos);
+	}
+
 	void set_sprite(const std::string &name) {
 		current_sprite_name = name;
 		update_sprite();
