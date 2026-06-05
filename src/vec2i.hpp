@@ -38,6 +38,7 @@ struct Vec2iHash {
 	size_t operator()(const Vec2i& v) const;
 };
 
+static const Vec2i ZERO  = { 0, 0 };
 static const Vec2i UP 	 = { 0, -1 };
 static const Vec2i DOWN  = { 0, 1 };
 static const Vec2i LEFT  = { -1, 0 };

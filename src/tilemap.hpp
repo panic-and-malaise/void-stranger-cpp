@@ -40,12 +40,15 @@ public:
 			return;
 		}
 
+		name = std::filesystem::path(filename).filename().replace_extension("").string();
+
 		tiles.clear();
 
 		std::string temp;
 
 		file.get() >> temp >> width >> height;
 		file.get() >> temp >> player_start_pos.x >> player_start_pos.y;
+		file.get() >> temp >> braine;
 		file.get() >> temp >> level_next;
 
 		char next_tile;
@@ -58,9 +61,11 @@ public:
 			TileType index = static_cast<TileType>(next_tile - '0');
 			tiles.push_back(index);
 		}
+
+		fill_ui_elements();
 	}
 
-	void export_to_file(const std::string &filename) {
+	void export_to_file(const std::string &filename, const math::Vec2i player_pos = {0, 0}) {
 		util::FileWrapper file(util::LEVEL_DIRECTORY + filename, std::ios::out);
 
 		if (!file) {
@@ -69,7 +74,13 @@ public:
 		}
 
 		file.write_line("size " + std::to_string(width) + " " + std::to_string(height));
-		file.write_line("player " + std::to_string(player_start_pos.x) + " " + std::to_string(player_start_pos.y));
+
+		if (player_pos.x and player_pos.y)
+			file.write_line("player " + std::to_string(player_pos.x) + " " + std::to_string(player_pos.y));
+		else
+			file.write_line("player " + std::to_string(player_start_pos.x) + " " + std::to_string(player_start_pos.y));
+
+		file.write_line("br " + std::to_string(braine));
 		file.write_line("level_next " + level_next);
 
 		for (int32_t y = 0; y < get_height(); y++) {
@@ -84,6 +95,13 @@ public:
 				line += ' ';
 			}
 			file.write_line(line);
+		}
+	}
+
+	void fill_ui_elements() {
+		size_t y = height - 1;
+		for (size_t x = 0; x < width; x++) {
+			set(x, y, TileType::BLANK_WHITE);
 		}
 	}
 
@@ -121,6 +139,14 @@ public:
 	std::string get_level_next() const {
 		return level_next;
 	}
+
+	std::string get_name() const {
+		return name;
+	}
+
+	int get_braine() const {
+		return braine;
+	}
 private:
 	bool is_in_bounds(const size_t x, const size_t y) const {
 		return x >= 0 && x < width and
@@ -130,6 +156,8 @@ private:
 	size_t width  = 0;
 	size_t height = 0;
 
+	std::string name{};
+	int braine = 0;
 	std::vector<TileType> tiles;
 
 	math::Vec2i player_start_pos{};
