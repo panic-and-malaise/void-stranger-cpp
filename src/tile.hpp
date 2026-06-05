@@ -54,6 +54,24 @@ enum class TileType {
 	WALL_EDGE_14,
 	WALL_EDGE_15,
 
+	BLANK_WHITE,
+
+	WALL_6,
+	WALL_7,
+	WALL_8,
+	WALL_9,
+	WALL_10,
+	WALL_11,
+	WALL_12,
+	WALL_13,
+
+	WALL_14,
+	WALL_15,
+	WALL_16,
+	WALL_17,
+	WALL_18,
+	WALL_19,
+
 	COUNT
 };
 

@@ -14,6 +14,8 @@ struct TileDefinition {
 	bool is_collidable = false;
 	bool is_fall = false;
 	bool is_stairs = false;
+	bool is_pickable = false;
+	bool render_under_decoration = true;
 };
 
 }

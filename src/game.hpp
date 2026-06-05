@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <ctime>
 #include <filesystem>
+#include <format>
 #include <iostream>
 #include <memory>
 #include <queue>
@@ -44,6 +45,7 @@
 #include "tileset.hpp"
 #include "tilemap_renderer.hpp"
 #include "iris_transition.hpp"
+#include "bitmap_font.hpp"
 
 namespace malaise {
 
@@ -89,9 +91,16 @@ public:
 			event_manager.emplace_event(2.f, [&]() {
 				extended_encore.play();
 				player.reset_animation_timer();
+				inputs_locked = false;
 			});
 
+
+		event_manager.emplace_event(1.f, [&]() {
+			player.set_health(7);
+		});
+		room_transition.start_open(player.get_position_centered());
 		player.play_fall_animation();
+		inputs_locked = true;
 
 		previous_time = render_clock.getElapsedTime();
 
@@ -102,7 +111,6 @@ public:
 			handle_mouse_pan();
 			handle_realtime_inputs();
 
-			update_simulation();
 			render();
 			
 			current_time = render_clock.getElapsedTime();
@@ -111,6 +119,7 @@ public:
 			float delta_time = time_elapsed.asSeconds();
 			render_accumulator += time_elapsed;
 
+			update_simulation(delta_time);
 			update_events(delta_time);
 			update_animations(delta_time);
 			update_window_title(time_elapsed);
@@ -139,8 +148,8 @@ private:
 	sf::View ui_view;
 
 	// ------------ PROGRAM CONSTANTS ------------;
-	static constexpr size_t WINDOW_WIDTH = 672;
-	static constexpr size_t WINDOW_HEIGHT = 432;
+	static constexpr size_t WINDOW_WIDTH = util::WINDOW_WIDTH;
+	static constexpr size_t WINDOW_HEIGHT = util::WINDOW_HEIGHT;
 
 	static constexpr size_t REFRESH_RATE = 60;
 	static constexpr size_t PHYSICS_TICK_RATE = 10;
@@ -171,6 +180,7 @@ private:
 	// ---------- FONTS ----------;
 	sf::Font main_font;
 	sf::Font mario_font;
+	font::BitmapFont alkhemikal;
 
 	// --------------- OBJECT COLLECTIONS ---------------;
 	malaise::animation::AnimationMatrix animation_matrix;
@@ -201,6 +211,8 @@ private:
 	tile::TileSet tileset;
 	tile::TileMapRenderer tilemap_renderer;
 	TileType current_tile = TileType::FLOOR;
+	
+	bool debug_mode = false;
 
 	animation::SquareIrisTransition room_transition;
 
@@ -243,6 +255,7 @@ private:
 	void init_fonts(void) {
 		main_font.loadFromFile(util::RESOURCE_DIRECTORY + "fonts/" + "RetroByte.ttf");
 		mario_font.loadFromFile(util::RESOURCE_DIRECTORY + "fonts/" + "Mario64.ttf");
+		alkhemikal.load_from_files("spr_fnt_text_12.png", "glyphs_fnt_text_12.csv");
 	}
 
 	void init_buttons(void) {
@@ -457,7 +470,7 @@ private:
 		// });
 	}
 
-	void update_simulation() {
+	void update_simulation(const float delta) {
 		while (physics_accumulator >= physics_timestep) { // Limit framerate to physics tickrate
 			if (physics_ticking) {
 				step_towards_goal();
@@ -465,6 +478,8 @@ private:
 			}
 			physics_accumulator -= physics_timestep;
 		}
+
+		player.update(delta);
 	}
 
 	void draw_ui_elements(void) {
@@ -487,13 +502,37 @@ private:
 
 		window.setView(world_view);
 
-		sf::Vector2i hover_mouse_pos = sf::Mouse::getPosition(window);
-		sf::Vector2f hover_world_pos = window.mapPixelToCoords(hover_mouse_pos);
+		std::string health = std::format("HP{:02}", player.get_health());
+		alkhemikal.draw_text(window, health, {
+			util::TILE_SIZE * util::SPRITE_SCALE,
+			WINDOW_HEIGHT - util::TILE_SIZE * util::SPRITE_SCALE});
 
-		// if (pattern_selected && cursor.is_painting())
-		// 	pattern_selected->render_pattern(window, hover_world_pos);
+		std::string braine = tilemap.get_braine() > 255 ? "B???" : std::format("B{:03}", tilemap.get_braine());
+		alkhemikal.draw_text(window, braine, {
+			WINDOW_WIDTH - 2 * util::TILE_SIZE * util::SPRITE_SCALE,
+			WINDOW_HEIGHT - util::TILE_SIZE * util::SPRITE_SCALE
+		});
 
-		cursor.render(window, util::float_vector_to_integer(hover_world_pos));
+		player.draw_items(window);
+
+		if (debug_mode) {
+			// painting tile
+			sf::Sprite sprite;
+			sprite.setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
+
+			const sf::Texture *texture = tileset.texture(current_tile);
+			if (!texture) return;
+			sprite.setTexture(*texture);
+			sprite.setTextureRect(tileset.rect_for(current_tile));
+			sprite.setPosition(0, WINDOW_HEIGHT - util::TILE_SIZE * util::SPRITE_SCALE);
+
+			window.draw(sprite);
+
+			sf::Vector2i hover_mouse_pos = sf::Mouse::getPosition(window);
+			sf::Vector2f hover_world_pos = window.mapPixelToCoords(hover_mouse_pos);
+
+			cursor.render(window, util::float_vector_to_integer(hover_world_pos));
+		}
 
 		room_transition.draw(window);
 	}
@@ -618,6 +657,8 @@ private:
 		// -------------------- SIMULATION TOGGLE --------------------;
 		physics_ticking = sf::Keyboard::isKeyPressed(sf::Keyboard::Space);
 
+		if (not debug_mode) return;
+
 		if (sf::Keyboard::isKeyPressed(sf::Keyboard::LControl)) {
 			cursor.set_type(Cursor::Type::EYEDROPPER);
 			return;
@@ -659,16 +700,67 @@ private:
 		if (inputs_locked) return;
 
 		switch (event.key.code) {
+			case sf::Keyboard::Up:
+				try_move_player(math::UP);
+				break;
+			case sf::Keyboard::Down:
+				try_move_player(math::DOWN);
+				break;
 			case sf::Keyboard::Left:
+				try_move_player(math::LEFT);
 				break;
-
 			case sf::Keyboard::Right:
+				try_move_player(math::RIGHT);
 				break;
+			case sf::Keyboard::Z: {
+				math::Vec2i target = player.vector_facing() * util::TILE_SIZE * util::SPRITE_SCALE;
+				math::Vec2i target_world_pos = player.get_position() + target;
+				math::Vec2i target_grid_pos = util::world_pos_to_grid(target_world_pos);
+				TileType tile = tilemap.get(target_grid_pos.x, target_grid_pos.y);
+				tile::TileDefinition target_tile = tileset.definition_for(tile);
 
-			case sf::Keyboard::Z:
+				sf::Sprite &void_rod_sprite = sprites.at("spr_void_rod_0");
+
+				switch (player.get_facing()) {
+					case Facing::RIGHT:
+						void_rod_sprite = sprites.at("spr_void_rod_0");
+						break;
+					case Facing::UP:
+						void_rod_sprite = sprites.at("spr_void_rod_1");
+						break;
+					case Facing::LEFT:
+						void_rod_sprite = sprites.at("spr_void_rod_2");
+						break;
+					case Facing::DOWN:
+						void_rod_sprite = sprites.at("spr_void_rod_3");
+						break;
+					default:
+						break;
+				}
+
+				void_rod_sprite.setPosition(target_world_pos.x, target_world_pos.y);
+				window.draw(void_rod_sprite);
+
+				if (!player.has_tile()) {
+					if (target_tile.is_pickable) {
+						player.pick_up_place_tile(tile);
+						tilemap.set(target_grid_pos.x, target_grid_pos.y, TileType::VOID);
+						sounds.at("snd_voidrod_store").play();
+
+					}
+				} else if (tile == TileType::VOID) {
+					TileType place = player.pick_up_place_tile(tile);
+					tilemap.set(target_grid_pos.x, target_grid_pos.y, place);
+					sounds.at("snd_voidrod_place").play();
+				}
+				break;
+			}
+			case sf::Keyboard::D:
+				debug_mode = not debug_mode;
+				break;
+			case sf::Keyboard::L:
 				tilemap.export_to_file(tilemap.get_name() + ".txt", player.get_position_grid());
 				break;
-
 			case sf::Keyboard::X: {
 				path_to_goal = path_through_tiles();
 				break;
@@ -701,18 +793,6 @@ private:
 							break;
 						case sf::Keyboard::Enter:
 							advance_scrollable_text();
-							break;
-						case sf::Keyboard::Up:
-							try_move_player(math::UP);
-							break;
-						case sf::Keyboard::Down:
-							try_move_player(math::DOWN);
-							break;
-						case sf::Keyboard::Left:
-							try_move_player(math::LEFT);
-							break;
-						case sf::Keyboard::Right:
-							try_move_player(math::RIGHT);
 							break;
 						default:
 							handle_single_inputs(event);
@@ -860,21 +940,19 @@ private:
 		tile::TileDefinition target_tile = tileset.definition_for(tilemap.get(target_grid_pos.x, target_grid_pos.y));
 		player.move(target, target_tile);
 		if (target_tile.is_stairs and not tilemap.get_level_next().empty()) {
+			inputs_locked = true;
 			sounds["snd_stairs"].play();
-			room_transition.start_close({
-				static_cast<float>(player.get_position().x) + 24.f,
-				static_cast<float>(player.get_position().y) + 24.f
-			});
+			player.clear_effects();
+			room_transition.start_close(player.get_position_centered());
 
 			event_manager.emplace_event(1.3f, [&]() {
 				tilemap.load_from_file(tilemap.get_level_next());
 				player.set_position_grid(tilemap.get_player_start_pos());
 				player.play_animation("blink");
+				player.clear_held_tile();
 
-				room_transition.start_open({
-					static_cast<float>(player.get_position().x) + 24.f,
-					static_cast<float>(player.get_position().y) + 24.f
-				});
+				room_transition.start_open(player.get_position_centered());
+				inputs_locked = false;
 			});
 
 			event_manager.emplace_event(3.f, [&]() {
@@ -907,17 +985,6 @@ private:
 
 	inline void draw_tiles() {
 		tilemap_renderer.draw(window, tilemap, tileset);
-
-		// painting tile
-		sf::Sprite sprite;
-		sprite.setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
-
-		const sf::Texture *texture = tileset.texture(current_tile);
-		if (!texture) return;
-		sprite.setTexture(*texture);
-		sprite.setTextureRect(tileset.rect_for(current_tile));
-		sprite.setPosition(0, WINDOW_HEIGHT - util::TILE_SIZE * util::SPRITE_SCALE);
-		window.draw(sprite);
 	}
 
 	inline void step_towards_goal() {

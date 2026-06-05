@@ -8,14 +8,14 @@ namespace malaise::animation {
 
 class SquareIrisTransition {
 public:
-    void start_close(const sf::Vector2f center_) {
+    void start_close(const math::Vec2i center_) {
         center = center_;
 
         state = State::Closing;
         half_size = max_half_size;
     }
 
-    void start_open(const sf::Vector2f center_) {
+    void start_open(const math::Vec2i center_) {
         center = center_;
 
         state = State::Opening;

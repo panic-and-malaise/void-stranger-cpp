@@ -1,5 +1,6 @@
 size 18 9
 player 7 4
+br 0
 level_next lvl_00.txt
 H 6 7 7 7 7 7 7 7 7 7 7 8 J ####
 H 9 2 0 1 1 1 0 1 1 1 1 : J 0 0 ##
