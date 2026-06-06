@@ -11,3 +11,6 @@ M ] 7 7 7 7 A 0 : 9 0 0 0 : 0 0 ##
 H 9 0 0 0 0 0 0 : ; < < < = 0 0 ##
 H ; < < < < < < = L G G G G 0 0 ##
 U U U U U U U U U U U U U U U U U U 
+ENTITIES
+EGG 11 1
+CHEST 11 3

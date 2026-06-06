@@ -70,6 +70,9 @@ enum class TileType {
 	EGG,
 	CHEST_CLOSE,
 	CHEST_OPEN,
+	ATONER,
+	CHEST_BIG_CLOSE,
+	CHEST_BIG_OPEN,
 
 	COUNT
 };

@@ -2,6 +2,7 @@
 #define MALAISE_GAME_HPP
 
 #include <cstdint>
+#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <format>
@@ -27,15 +28,19 @@
 #include <SFML/Audio/Music.hpp>
 #include <SFML/Audio/SoundBuffer.hpp>
 #include <SFML/System/Vector2.hpp>
+#include <SFML/Graphics/Rect.hpp>
 
 #include "animation.hpp"
 #include "animation_matrix.hpp"
 #include "button.hpp"
 #include "cursor.hpp"
 #include "entity.hpp"
+#include "entity_chest_void_rod.hpp"
 #include "event_manager.hpp"
+#include "sprite_animation.hpp"
 #include "text_dynamic.hpp"
 #include "tile_definition.hpp"
+#include "tile_type.hpp"
 #include "typewriter.hpp"
 #include "util.hpp"
 #include "vec2i.hpp"
@@ -46,6 +51,7 @@
 #include "tilemap_renderer.hpp"
 #include "iris_transition.hpp"
 #include "bitmap_font.hpp"
+#include "entity_chest.hpp"
 
 namespace malaise {
 
@@ -56,8 +62,8 @@ public:
 
 		print_controls_help();
 		player.set_position({
-			5 * util::TILE_SIZE * util::SPRITE_SCALE,
-			7 * util::TILE_SIZE * util::SPRITE_SCALE
+			5 * util::TILE_SIZE_SCALED,
+			7 * util::TILE_SIZE_SCALED
 		});
 
 		init_window();
@@ -103,8 +109,6 @@ public:
 		room_transition.start_open(player.get_position_centered());
 		player.play_fall_animation();
 		inputs_locked = true;
-
-		tilemap.add_entity<Egg>(math::Vec2i{10, 5});
 
 		previous_time = render_clock.getElapsedTime();
 
@@ -212,12 +216,18 @@ private:
 	tile::TileMap tilemap{18, 9};
 	tile::TileSet tileset;
 	tile::TileMapRenderer tilemap_renderer;
+
 	tile::TileType current_tile = tile::TileType::FLOOR;
+	EntityType current_entity = EntityType::EGG;
 	
 	bool debug_mode = false;
 
 	animation::SquareIrisTransition room_transition;
 
+	std::unordered_map<std::string, animation::SpriteAnimation> animations;
+	std::vector<animation::AnimationInstance> effects;
+
+	bool is_pathfinding = false;
 	std::vector<math::Vec2i> path_to_goal;
 
 	// --------------- PRIVATE METHODS ---------------;
@@ -229,10 +239,6 @@ private:
 	}
 
 	void init_simulation(int argc, char *argv[]) {
-		DEBUG_PRINT("\n\n----- Please compile in Release mode for best perfomance!!! -----");
-		DEBUG_PRINT("\n----- Please compile in Release mode for best perfomance!!! -----");
-		DEBUG_PRINT("\n----- Please compile in Release mode for best perfomance!!! -----\n\n");
-
 		// ----- SEED AND SIMULATION -----
 		uint32_t seed = rng();
 
@@ -439,7 +445,15 @@ private:
 	}
 
 	void init_animations(void) {
-		// typewriters.emplace_back(*welcome_text, "Welcome to Cellbi! :)", 10.f, "");
+		animation::SpriteAnimation fall;
+
+		fall.base_name = "spr_fall";
+		fall.frame_count = 6;
+		fall.frame_length = 0.1f;
+		fall.loops = false;
+		fall.load_frames_by_name(sprites);
+
+		animations.emplace("fall", fall);
 	}
 
 	void init_patterns(void) {
@@ -474,7 +488,7 @@ private:
 
 	void update_simulation(const float delta) {
 		while (physics_accumulator >= physics_timestep) { // Limit framerate to physics tickrate
-			if (physics_ticking) {
+			if (is_pathfinding) {
 				step_towards_goal();
 				// simulation.step();
 			}
@@ -482,6 +496,37 @@ private:
 		}
 
 		player.update(delta);
+		tilemap.update(delta);
+
+		for (auto &entity : tilemap.get_entities()) {
+			if (entity->falling) {
+				play_effect("fall", entity->get_position() * util::TILE_SIZE_SCALED);
+				entity->falling = false;
+				entity->dead = true;
+			}
+		}
+
+		if (player.is_dead()) {
+
+			player.set_dead(false);
+			inputs_locked = true;
+			player.clear_effects();
+
+			room_transition.start_close(player.get_position_centered());
+
+			event_manager.emplace_event(1.3f, [&]() {
+				if (player.get_locusts() < 0)
+					stop();
+
+				tilemap.load_from_file(tilemap.get_name() + ".txt");
+				player.set_position_grid(tilemap.get_player_start_pos());
+				player.play_animation("blink");
+				player.clear_held_tile();
+
+				room_transition.start_open(player.get_position_centered());
+				inputs_locked = false;
+			});
+		}
 	}
 
 	void draw_ui_elements(void) {
@@ -506,14 +551,22 @@ private:
 
 		std::string health = std::format("HP{:02}", player.get_health());
 		alkhemikal.draw_text(window, health, {
-			util::TILE_SIZE * util::SPRITE_SCALE,
-			WINDOW_HEIGHT - util::TILE_SIZE * util::SPRITE_SCALE});
+			util::TILE_SIZE_SCALED,
+			WINDOW_HEIGHT - util::TILE_SIZE_SCALED});
 
 		std::string braine = tilemap.get_braine() > 255 ? "B???" : std::format("B{:03}", tilemap.get_braine());
 		alkhemikal.draw_text(window, braine, {
-			WINDOW_WIDTH - 2 * util::TILE_SIZE * util::SPRITE_SCALE,
-			WINDOW_HEIGHT - util::TILE_SIZE * util::SPRITE_SCALE
+			WINDOW_WIDTH - 2 * util::TILE_SIZE_SCALED,
+			WINDOW_HEIGHT - util::TILE_SIZE_SCALED
 		});
+
+		if (player.ever_acquired_locust()) {
+			std::string locusts = player.get_locusts() > 99 ? "∞" : std::format("{:02}", player.get_locusts());
+			alkhemikal.draw_text(window, locusts, {
+				5 * util::TILE_SIZE_SCALED,
+				WINDOW_HEIGHT - util::TILE_SIZE_SCALED
+			});
+		}
 
 		player.draw_items(window);
 
@@ -526,7 +579,16 @@ private:
 			if (!texture) return;
 			sprite.setTexture(*texture);
 			sprite.setTextureRect(tileset.rect_for(current_tile));
-			sprite.setPosition(0, WINDOW_HEIGHT - util::TILE_SIZE * util::SPRITE_SCALE);
+			sprite.setPosition(0, WINDOW_HEIGHT - util::TILE_SIZE_SCALED);
+
+			window.draw(sprite);
+
+			texture = tileset.texture(static_cast<tile::TileType>(current_entity));
+			
+			if (!texture) return;
+			sprite.setTexture(*texture);
+			sprite.setTextureRect(sf::IntRect{0, 0, 16, 16});
+			sprite.setPosition(util::TILE_SIZE_SCALED, WINDOW_HEIGHT - util::TILE_SIZE_SCALED);
 
 			window.draw(sprite);
 
@@ -535,6 +597,23 @@ private:
 
 			cursor.render(window, util::float_vector_to_integer(hover_world_pos));
 		}
+
+		for (auto &effect : effects) {
+			sf::Sprite *frame = effect.animation->frames[effect.current_frame];
+			sf::Vector2f bounds = {
+				frame->getLocalBounds().width / 2,
+				frame->getLocalBounds().height / 2
+			};
+
+			frame->setOrigin(bounds.x, bounds.y);
+			frame->setPosition(
+				effect.offset.x + bounds.x * util::SPRITE_SCALE,
+				effect.offset.y + bounds.y * util::SPRITE_SCALE
+			);
+			frame->setRotation(effect.rotation);
+			window.draw(*frame);
+		}
+
 
 		room_transition.draw(window);
 	}
@@ -564,6 +643,14 @@ private:
 	void update_animations(const float delta_time) {
 		player.tick_animation(delta_time);
 		room_transition.update(delta_time);
+
+		for (auto it = effects.begin(); it != effects.end(); ) {
+			tick_animation_instance(*it, delta_time, true);
+			if (it->finished)
+				it = effects.erase(it);
+			else
+				++it;
+		}
 
 		for (auto &animation_queue : animation_matrix.get_animations()) {
 			if (animation_queue.front().is_finished()) // Play animations from the queue in sequence, popping when finished
@@ -616,27 +703,20 @@ private:
 	}
 
 	void handle_window_resize(const unsigned int width, const unsigned int height) {
-		float window_ratio =
-        static_cast<float>(width) /
-        static_cast<float>(height);
+		float window_ratio = static_cast<float>(width) / static_cast<float>(height);
 
-		float target_ratio =
-			WINDOW_WIDTH / (float)WINDOW_HEIGHT;
+		float target_ratio = WINDOW_WIDTH / (float)WINDOW_HEIGHT;
 
 		float size_x = 1.f;
 		float size_y = 1.f;
 		float pos_x = 0.f;
 		float pos_y = 0.f;
 
-		if (window_ratio > target_ratio)
-		{
-			// window too wide
+		if (window_ratio > target_ratio) {
 			size_x = target_ratio / window_ratio;
 			pos_x = (1.f - size_x) / 2.f;
 		}
-		else
-		{
-			// window too tall
+		else {
 			size_y = window_ratio / target_ratio;
 			pos_y = (1.f - size_y) / 2.f;
 		}
@@ -644,13 +724,6 @@ private:
 		world_view.setViewport(
 			sf::FloatRect(pos_x, pos_y, size_x, size_y)
 		);
-
-		// ui_view.setSize(width, height);
-		// ui_view.setCenter(width / 2.f, height / 2.f);
-
-		// float old_x = world_view.getSize().x; // Attempt to maintain camera center
-		// world_view.setSize(width, height);
-		// world_view.zoom(old_x / width);
 	}
 
 	void handle_realtime_inputs(void) {
@@ -668,7 +741,7 @@ private:
 
 		cursor.set_type(Cursor::Type::PAINT_BRUSH);
 
-		// -------------------- CELL PAINTING --------------------;
+		// -------------------- TILE PAINTING --------------------;
 		if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
 			sf::Vector2i pixel_pos = sf::Mouse::getPosition(window);
 			sf::Vector2f world_pos = window.mapPixelToCoords(pixel_pos);
@@ -681,7 +754,7 @@ private:
 
 			tilemap.set(grid_pos.x, grid_pos.y, current_tile);
 
-		// -------------------- CELL ERASING --------------------;
+		// -------------------- TILE ERASING --------------------;
 		} else if (!physics_ticking && sf::Mouse::isButtonPressed(sf::Mouse::Right)) {
 			sf::Vector2i pixel_pos = sf::Mouse::getPosition(window);
 			sf::Vector2f world_pos = window.mapPixelToCoords(pixel_pos);
@@ -695,6 +768,36 @@ private:
 			math::Vec2i grid_pos = util::world_pos_to_grid(center);
 
 			tilemap.set(grid_pos.x, grid_pos.y, tile::TileType::VOID);
+
+		// -------------------- ENTITY PAINTING --------------------;
+		} else if (sf::Mouse::isButtonPressed(sf::Mouse::Middle)) {
+			sf::Vector2i pixel_pos = sf::Mouse::getPosition(window);
+			sf::Vector2f world_pos = window.mapPixelToCoords(pixel_pos);
+
+			math::Vec2i center = {
+				static_cast<int32_t>(world_pos.x),
+				static_cast<int32_t>(world_pos.y)
+			};
+			math::Vec2i grid_pos = util::world_pos_to_grid(center);
+
+			if (tilemap.get_entity(grid_pos.x, grid_pos.y)) return;
+
+			switch (current_entity) {
+				case EntityType::EGG:
+					tilemap.add_entity<Egg>(grid_pos);
+					break;
+				case EntityType::CHEST:
+					tilemap.add_entity<entity::Chest>(grid_pos);
+					break;
+				case EntityType::ATONER:
+					tilemap.add_entity<Atoner>(grid_pos);
+					break;
+				case EntityType::CHEST_VOID_ROD:
+					tilemap.add_entity<entity::ChestVoidRod>(grid_pos);
+					break;
+				default:
+					break;
+			}
 		}
 	}
 	
@@ -715,7 +818,7 @@ private:
 				try_move_player(math::RIGHT);
 				break;
 			case sf::Keyboard::Z: {
-				math::Vec2i target = player.vector_facing() * util::TILE_SIZE * util::SPRITE_SCALE;
+				math::Vec2i target = player.vector_facing() * util::TILE_SIZE_SCALED;
 				math::Vec2i target_world_pos = player.get_position() + target;
 				math::Vec2i target_grid_pos = util::world_pos_to_grid(target_world_pos);
 
@@ -723,29 +826,14 @@ private:
 				tile::TileDefinition target_tile = tileset.definition_for(tile);
 
 				Entity *target_entity = tilemap.get_entity(target_grid_pos.x, target_grid_pos.y);
-				if (target_entity) break;
 
-				sf::Sprite &void_rod_sprite = sprites.at("spr_void_rod_0");
-
-				switch (player.get_facing()) {
-					case Facing::RIGHT:
-						void_rod_sprite = sprites.at("spr_void_rod_0");
-						break;
-					case Facing::UP:
-						void_rod_sprite = sprites.at("spr_void_rod_1");
-						break;
-					case Facing::LEFT:
-						void_rod_sprite = sprites.at("spr_void_rod_2");
-						break;
-					case Facing::DOWN:
-						void_rod_sprite = sprites.at("spr_void_rod_3");
-						break;
-					default:
-						break;
+				if (target_entity) {
+					if (target_entity->on_interact(player))
+						sounds.at("snd_open").play();
+					break;
 				}
 
-				void_rod_sprite.setPosition(target_world_pos.x, target_world_pos.y);
-				window.draw(void_rod_sprite);
+				if (not player.has_void_rod()) break;
 
 				if (!player.has_tile()) {
 					if (target_tile.is_pickable) {
@@ -759,6 +847,7 @@ private:
 					tilemap.set(target_grid_pos.x, target_grid_pos.y, place);
 					sounds.at("snd_voidrod_place").play();
 				}
+
 				break;
 			}
 			case sf::Keyboard::D:
@@ -769,6 +858,8 @@ private:
 				break;
 			case sf::Keyboard::X: {
 				path_to_goal = path_through_tiles();
+				if (not path_to_goal.empty())
+					is_pathfinding = true;
 				break;
 			}
 			default:
@@ -777,7 +868,11 @@ private:
 	}
 
 	void handle_scroll_tile_switching(const float scroll_delta) {
-		scroll_tiles(scroll_delta > 0.f ? 1 : -1);
+		if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift)) {
+			scroll_entities(scroll_delta > 0.f ? 1 : -1);
+		} else {
+			scroll_tiles(scroll_delta > 0.f ? 1 : -1);
+		}
 	}
 
 	void handle_sfml_events(void) {
@@ -828,10 +923,6 @@ private:
 								current_tile = tilemap.get(hover_grid_pos.x, hover_grid_pos.y);
 							}
 
-							break;
-						case sf::Mouse::Middle:
-							dragging = true;
-							lastMousePos = sf::Mouse::getPosition(window);
 							break;
 						default:
 							break;
@@ -885,17 +976,10 @@ private:
 
 		help_menu << "Controls:\n\n";
 
-		help_menu << "  Enter \t\t\t\t advance to next text box or close text\n\n";
-		help_menu << "  Hold Middle Mouse and Drag \t\t move view\n";
-		help_menu << "  Mouse Wheel Scroll \t\t\t zoom in / out\n\n";
+		help_menu << "  Arrow Keys \t\t\t\t move\n\n";
+		help_menu << "  Z \t\t\t\t\t pick up tile\n";
 
-		help_menu << "  Left Mouse Click \t\t\t paint with selected pattern\n";
-		help_menu << "  Right Mouse Click \t\t\t erase a 10x10 area\n";
-		help_menu << "  Left & Right Arrow Keys \t\t cycle selected pattern\n\n";
-
-		help_menu << "  C \t\t\t\t\t toggle the color selector UI\n";
-		help_menu << "  X \t\t\t\t\t swap current color\n";
-		help_menu << "  LCtrl + Left Mouse Click \t\t use the color picker";
+		help_menu << "  D \t\t\t\t\t debug menu\n";
 		help_menu << "\n";
 
 		std::cout << help_menu.str();
@@ -940,19 +1024,26 @@ private:
 	}
 
 	inline void try_move_player(const math::Vec2i direction) {
-		math::Vec2i target = direction * util::TILE_SIZE * util::SPRITE_SCALE;
+		math::Vec2i target = direction * util::TILE_SIZE_SCALED;
 		math::Vec2i target_grid_pos = util::world_pos_to_grid(player.get_position() + target);
 
+		math::Vec2i target_push_pos = util::world_pos_to_grid(player.get_position() + target + target);
+
 		tile::TileDefinition target_tile = tileset.definition_for(tilemap.get(target_grid_pos.x, target_grid_pos.y));
+		tile::TileDefinition push_tile = tileset.definition_for(tilemap.get(target_push_pos.x, target_push_pos.y));
+
 		Entity *target_entity = tilemap.get_entity(target_grid_pos.x, target_grid_pos.y);
+		Entity *push_entity = tilemap.get_entity(target_push_pos.x, target_push_pos.y);
 
-		player.move(target, target_tile, target_entity);
+		player.move(target, target_tile, target_entity, push_tile, push_entity);
 
-		if (target_tile.is_stairs and not tilemap.get_level_next().empty()) {
+		if (target_tile.is_stairs and not tilemap.get_level_next().empty() and not target_entity) {
 			inputs_locked = true;
 			sounds["snd_stairs"].play();
 			player.clear_effects();
 			room_transition.start_close(player.get_position_centered());
+
+			is_pathfinding = false;
 
 			event_manager.emplace_event(1.3f, [&]() {
 				tilemap.load_from_file(tilemap.get_level_next());
@@ -980,9 +1071,10 @@ private:
 			for (int32_t x = 0; x < tilemap.get_width(); x++) {
 				const tile::TileType tile = tilemap.get(x, y);
 				tile::TileDefinition definition = tileset.definition_for(tile);
+				Entity *entity = tilemap.get_entity(x, y);
 				math::Vec2i position = {x, y};
 
-				if (!definition.is_collidable and !definition.is_fall)
+				if (!definition.is_collidable and !definition.is_fall and !entity)
 					walkable_tiles.push_back(position);
 				if (definition.is_stairs)
 					goal = position;
@@ -1001,7 +1093,7 @@ private:
 		auto next_step = path_to_goal.front();
 		path_to_goal.erase(path_to_goal.begin());
 		math::Vec2i target = next_step - player.get_position_grid();
-		std::cout << "(" << next_step.x << ", " << next_step.y << ") | (" << target.x << ", " << target.y << ")\n";
+		// std::cout << "(" << next_step.x << ", " << next_step.y << ") | (" << target.x << ", " << target.y << ")\n";
 		try_move_player(target);
 	}
 
@@ -1026,6 +1118,65 @@ private:
 			new_index -= tile_count;
 
 		current_tile = static_cast<tile::TileType>(new_index);
+	}
+
+	inline void scroll_entities(const int step) {
+		size_t tile_min = static_cast<size_t>(EntityType::EGG);
+		size_t tile_count = static_cast<size_t>(EntityType::CHEST_VOID_ROD);
+
+		int new_index = static_cast<int>(current_entity) + step;
+
+		if (new_index < tile_min)
+			new_index = tile_count;
+		else if (new_index > tile_count)
+			new_index = tile_min;
+
+		// std::cout << "(" << tile_min << " -> " << tile_count << "): " << new_index << '\n';
+
+		current_entity = static_cast<EntityType>(new_index);
+	}
+
+	void play_effect(const std::string &name, const math::Vec2i offset = {0, 0}, const float rotation = 0.f) {
+		auto it = animations.find(name);
+
+		if (it == animations.end())
+			return;
+
+		effects.push_back({
+			.animation = &it->second,
+			.current_frame = 0,
+			.timer = 0.f,
+			.rotation = rotation,
+			.offset = offset
+		});
+	}
+
+	void tick_animation_instance(animation::AnimationInstance &instance, const float delta, const bool is_effect = false) {
+		const animation::SpriteAnimation *current_animation = instance.animation;
+		if (!current_animation) return;
+
+		instance.timer += delta;
+
+		if (!current_animation->uses_global_time) {
+			if (instance.timer < current_animation->frame_length)
+				return;
+
+			instance.timer = 0.f;
+			instance.current_frame++;
+
+			if (instance.current_frame >= current_animation->frames.size()) {
+				instance.current_frame = 0;
+				if (!current_animation->loops) {
+					instance.finished = true;
+				}
+			}
+		} else {
+			float beat_duration = current_animation->frame_length;
+
+			instance.current_frame =
+				static_cast<size_t>(instance.timer / beat_duration)
+				% current_animation->frames.size();
+		}
 	}
 };
 

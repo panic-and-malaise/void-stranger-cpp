@@ -11,3 +11,7 @@ H b < < < < < < < ? 0 V = J 0 0 ##
 3 H ; < < < < < < a 0 : J 3 0 0 ##
 3 3 G G G G G G M b < ` J 3 0 0 ##
 U U U U U U U U U U U U U U U U U U 
+ENTITIES
+EGG 10 1
+EGG 10 5
+EGG 4 5

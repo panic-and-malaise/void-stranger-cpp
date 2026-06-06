@@ -11,3 +11,11 @@ level_next br_009.txt
 3 H ; < < < ` E 9 0 0 0 3 : 0 0 ##
 3 K G G G G G H b < < < < ` 0 0 ##
 U U U U U U U U U U U U U U U U U U 
+ENTITIES
+EGG 3 3
+EGG 4 3
+EGG 5 3
+EGG 10 4
+EGG 11 4
+EGG 10 6
+EGG 11 6

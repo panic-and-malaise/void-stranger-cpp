@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <iostream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -50,7 +51,10 @@ public:
 				name.find("spr_items")   != std::string::npos or
 				name.find("spr_sparkle") != std::string::npos or
 				name.find("spr_voidrod") != std::string::npos or
-				name.find("spr_void_rod") != std::string::npos
+				name.find("spr_void_rod") != std::string::npos or
+				name.find("spr_locust") != std::string::npos or
+				name.find("spr_soulglow") != std::string::npos or
+				name.find("spr_sweat") != std::string::npos
 				) {
 				sprites.emplace(name, sprite);
 			}
@@ -226,6 +230,48 @@ public:
 		animations.emplace("void_rod_l", void_rod_l);
 		animations.emplace("void_rod_d", void_rod_d);
 
+		animation::SpriteAnimation item_get = {
+			.base_name = "spr_player_item_get",
+			.frame_count = 1,
+			.frame_length = 2.f,
+			.loops = false
+		};
+		item_get.frames.push_back(&sprites.at("spr_player_item_get_0"));
+
+		animations.emplace("item_get", item_get);
+
+		animation::SpriteAnimation soul_glow = {
+			.base_name = "spr_soulglow_big",
+			.frame_count = 5,
+			.frame_length = .2f,
+			.loops = false
+		};
+		soul_glow.load_frames_by_name(sprites);
+		soul_glow.load_frames_by_name(sprites);
+
+		animations.emplace("soul_glow", soul_glow);
+
+		animation::SpriteAnimation locust = {
+			.base_name = "spr_locust",
+			.frame_count = 1,
+			.frame_length = 2.f,
+			.loops = false
+		};
+		locust.frames.push_back(&sprites.at("spr_locust"));
+
+		animations.emplace("locust", locust);
+
+		animation::SpriteAnimation sweat = {
+			.base_name = "spr_sweat",
+			.frame_count = 5,
+			.frame_length = .2f,
+			.loops = false
+		};
+		sweat.load_frames_by_name(sprites);
+		sweat.load_frames_by_name(sprites);
+
+		animations.emplace("sweat", sweat);
+
 		play_animation("idle_down");
 	}
 
@@ -281,6 +327,18 @@ public:
 	}
 
 	void draw_items(sf::RenderTarget &target) {
+		if (locust_ever_acquired) {
+			auto locust = sprites.find("spr_locust_idol_0");
+
+			if (locust == sprites.end()) return;
+
+			locust->second.setPosition(
+				4 * util::TILE_SIZE * util::SPRITE_SCALE,
+				util::WINDOW_HEIGHT - util::TILE_SIZE * util::SPRITE_SCALE
+			);
+			target.draw(locust->second);
+		}
+
 		if (has_void_rod()) {
 			auto void_rod = sprites.find("spr_voidrod_icon_1");
 
@@ -351,6 +409,21 @@ public:
 		return facing;
 	}
 
+	void set_facing(math::Vec2i direction) {
+		if (direction == math::UP) {
+			facing = Facing::UP;
+		}
+		else if (direction == math::DOWN) {
+			facing = Facing::DOWN;
+		}
+		else if (direction == math::LEFT) {
+			facing = Facing::LEFT;
+		}
+		else if (direction == math::RIGHT) {
+			facing = Facing::RIGHT;
+		}
+	}
+
 	math::Vec2i vector_facing() const {
 		switch (facing) {
 			case Facing::UP:
@@ -381,6 +454,28 @@ public:
 		health = health_;
 	}
 
+	int get_locusts() const {
+		return locusts;
+	}
+
+	void add_locusts(const int count) {
+		locusts += count;
+		if (not locust_ever_acquired and count > 0)
+			locust_ever_acquired = true;
+	}
+
+	bool ever_acquired_locust() const {
+		return locust_ever_acquired;
+	}
+
+	bool is_dead() const { return dead; }
+
+	void set_dead(const bool val) { dead = val; }
+
+	bool is_above_void() const { return above_pit; }
+
+	void give_void_rod() { void_rod = true; }
+
 	bool has_void_rod() const {
 		return void_rod;
 	}
@@ -407,11 +502,21 @@ public:
 		primary_animation.timer = 0.f;
 	}
 
-	void move(const math::Vec2i pos, tile::TileDefinition target_tile, Entity *entity) {
+	void move(const math::Vec2i pos, tile::TileDefinition target_tile, Entity *entity, tile::TileDefinition push_tile, Entity *push_entity) { // TODO: Clean up parameters
 		if (move_timer > 0.0f) return;
 		if (move_timer <= 0.0f) move_timer = time_between_movements;
 
-		if (target_tile.is_fall) return;
+		if (above_pit and pos !=  previous_position) return;
+
+		if (target_tile.is_fall) {
+			above_pit = true;
+			coyote_timer = 0.f;
+			previous_position = { -pos.x, -pos.y };
+			play_effect("sweat");
+		} else {
+			above_pit = false;
+			coyote_timer = 0.f;
+		}
 		
 		math::Vec2i target = position + pos;
 
@@ -449,14 +554,11 @@ public:
 
 			play_push_animation();
 
-			if (entity)
+			if (entity and not push_tile.is_collidable and not push_entity)
 				entity->on_bump(*this, vector_facing());
 
 			return;
 		}
-
-		if (target_tile.is_fall)
-			play_animation("fall");
 
 		set_position(target);
 	}
@@ -466,6 +568,19 @@ public:
 			move_timer -= delta;
 		} else {
 			move_timer = 0.0f;
+		}
+
+		if (above_pit) {
+			coyote_timer += delta;
+			if (coyote_timer > COYOTE_TIME) {
+				sounds["snd_player_fall"].play();
+				play_animation("fall");
+				health = 0;
+				dead = true;
+				coyote_timer = 0.f;
+				above_pit = false;
+				add_locusts(-1);
+			}
 		}
 	}
 
@@ -558,16 +673,24 @@ public:
 	}
 private:
 	math::Vec2i position{};
+	math::Vec2i previous_position{};
 	math::Vec2i render_offset{};
 
 	Facing facing = Facing::DOWN;
 	int health = 10;
 
-	bool void_rod = true;
-	bool void_memory = true;
+	bool void_rod = false;
+	bool void_memory = false;
 	bool void_wings = false;
 	bool void_sword = false;
-	bool void_rod_true = false;
+	bool void_rod_endless = false;
+	bool locust_ever_acquired = false;
+
+	int locusts = 0;
+	bool above_pit = false;
+	float coyote_timer = 0.0f;
+	static constexpr float COYOTE_TIME = 2.f;
+	bool dead = false;
 
 	tile::TileType picked_up_tile = tile::TileType::VOID;
 

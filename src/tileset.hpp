@@ -350,6 +350,24 @@ public:
 			.texture_rect = { 0, 0, 16, 16 },
 			.is_collidable = true,
 		};
+
+		definitions[(size_t)TileType::ATONER] = {
+			.texture = &textures.at("spr_atoner_0"),
+			.texture_rect = { 0, 0, 16, 16 },
+			.is_collidable = true,
+		};
+
+		definitions[(size_t)TileType::CHEST_BIG_CLOSE] = {
+			.texture = &textures.at("spr_chest_0"),
+			.texture_rect = { 0, 0, 32, 16 },
+			.is_collidable = true,
+		};
+
+		definitions[(size_t)TileType::CHEST_BIG_OPEN] = {
+			.texture = &textures.at("spr_chest_1"),
+			.texture_rect = { 0, 0, 32, 16 },
+			.is_collidable = true,
+		};
 	}
 
 	const TileDefinition definition_for(const TileType type) const {
