@@ -2,21 +2,25 @@
 #define MALAISE_TILEMAP_HPP
 
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include <SFML/Graphics/RenderTarget.hpp>
 
 #include "file_wrapper.hpp"
-#include "tile.hpp"
+#include "tile_type.hpp"
 #include "util.hpp"
 #include "vec2i.hpp"
+#include "entity.hpp"
 
 namespace malaise::tile {
 
 class TileMap {
 public:
-	TileMap(const size_t width_, const size_t height_) : width(width_), height(height_), tiles(width * height, TileType::VOID) {
+	TileMap(const size_t width_, const size_t height_)
+		: width(width_), height(height_),
+		tiles(width * height, TileType::VOID) {
 		// init side boundaries
 		for (size_t y = 0; y < 9; y++) {
 			for (size_t x = 0; x < 2; x++) {
@@ -116,6 +120,36 @@ public:
 			tiles[y * width + x] = type;
 	}
 
+	Entity* get_entity(const int32_t x, const int32_t y) const {
+		math::Vec2i pos(x, y);
+		for (auto &entity : entities) {
+			if (entity->get_position() == pos)
+				return entity.get();
+		}
+
+		return nullptr;
+	}
+
+	template<typename T, typename... Args>
+    T& add_entity(Args&&... args) {
+        auto entity =
+            std::make_unique<T>(
+                std::forward<Args>(args)...
+            );
+
+        T &ref = *entity;
+
+        entities.push_back(
+            std::move(entity)
+        );
+
+        return ref;
+    }
+
+	const std::vector<std::unique_ptr<Entity>>& get_entities() const {
+		return entities;
+	}
+
 	std::vector<TileType> get_tiles() const {
 		return tiles;
 	}
@@ -159,6 +193,7 @@ private:
 	std::string name{};
 	int braine = 0;
 	std::vector<TileType> tiles;
+	std::vector<std::unique_ptr<Entity>> entities;
 
 	math::Vec2i player_start_pos{};
 	std::string level_next{};

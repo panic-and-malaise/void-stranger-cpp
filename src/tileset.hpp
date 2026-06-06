@@ -7,7 +7,7 @@
 #include <SFML/Graphics/Rect.hpp>
 #include <SFML/Graphics/Texture.hpp>
 
-#include "tile.hpp"
+#include "tile_type.hpp"
 #include "tile_definition.hpp"
 
 namespace malaise::tile {
@@ -330,6 +330,24 @@ public:
 		definitions[(size_t)TileType::WALL_19] = {
 			.texture = &textures.at("spr_tilemap_br2"),
 			.texture_rect = {17, 51, 16, 16},
+			.is_collidable = true,
+		};
+
+		definitions[(size_t)TileType::CHEST_CLOSE] = {
+			.texture = &textures.at("spr_chest_regular_0"),
+			.texture_rect = { 0, 0, 16, 16 },
+			.is_collidable = true,
+		};
+
+		definitions[(size_t)TileType::CHEST_OPEN] = {
+			.texture = &textures.at("spr_chest_regular_1"),
+			.texture_rect = { 0, 0, 16, 16 },
+			.is_collidable = true,
+		};
+
+		definitions[(size_t)TileType::EGG] = {
+			.texture = &textures.at("spr_boulder_0"),
+			.texture_rect = { 0, 0, 16, 16 },
 			.is_collidable = true,
 		};
 	}

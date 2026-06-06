@@ -32,6 +32,7 @@
 #include "animation_matrix.hpp"
 #include "button.hpp"
 #include "cursor.hpp"
+#include "entity.hpp"
 #include "event_manager.hpp"
 #include "text_dynamic.hpp"
 #include "tile_definition.hpp"
@@ -40,7 +41,6 @@
 #include "vec2i.hpp"
 #include "djikstra.hpp"
 #include "player.hpp"
-#include "tile.hpp"
 #include "tilemap.hpp"
 #include "tileset.hpp"
 #include "tilemap_renderer.hpp"
@@ -99,9 +99,12 @@ public:
 			player.set_health(7);
 			sounds.at("snd_push").play();
 		});
+
 		room_transition.start_open(player.get_position_centered());
 		player.play_fall_animation();
 		inputs_locked = true;
+
+		tilemap.add_entity<Egg>(math::Vec2i{10, 5});
 
 		previous_time = render_clock.getElapsedTime();
 
@@ -155,7 +158,7 @@ private:
 	static constexpr size_t REFRESH_RATE = 60;
 	static constexpr size_t PHYSICS_TICK_RATE = 10;
 
-	const std::string WINDOW_TITLE = "SPA-DZ-02";
+	const std::string WINDOW_TITLE = "SPA-DZ-03";
 
 	// ---------- RANDOM NUMBER GENERATION ----------;
 	std::random_device rd{};
@@ -206,12 +209,10 @@ private:
 
 	Player player;
 
-	Tile goal{ {0,0}, {}, TileType::VOID };
-
 	tile::TileMap tilemap{18, 9};
 	tile::TileSet tileset;
 	tile::TileMapRenderer tilemap_renderer;
-	TileType current_tile = TileType::FLOOR;
+	tile::TileType current_tile = tile::TileType::FLOOR;
 	
 	bool debug_mode = false;
 
@@ -425,13 +426,13 @@ private:
 	void init_tiles(void) {
 		tileset.init_tile_definitions(textures);
 
-		tilemap.set(2, 0, TileType::FLOOR);
-		tilemap.set(2, 1, TileType::FLOOR_UNDER);
-		tilemap.set(3, 0, TileType::GLASS);
-		tilemap.set(4, 0, TileType::GOAL);
-		tilemap.set(5, 0, TileType::WALL_CORNER_TOP_LEFT);
-		tilemap.set(6, 0, TileType::WALL_TOP);
-		tilemap.set(7, 0, TileType::WALL_CORNER_TOP_RIGHT);
+		tilemap.set(2, 0, tile::TileType::FLOOR);
+		tilemap.set(2, 1, tile::TileType::FLOOR_UNDER);
+		tilemap.set(3, 0, tile::TileType::GLASS);
+		tilemap.set(4, 0, tile::TileType::GOAL);
+		tilemap.set(5, 0, tile::TileType::WALL_CORNER_TOP_LEFT);
+		tilemap.set(6, 0, tile::TileType::WALL_TOP);
+		tilemap.set(7, 0, tile::TileType::WALL_CORNER_TOP_RIGHT);
 
 		tilemap.load_from_file("br_002.txt");
 		player.set_position_grid(tilemap.get_player_start_pos());
@@ -693,7 +694,7 @@ private:
 			};
 			math::Vec2i grid_pos = util::world_pos_to_grid(center);
 
-			tilemap.set(grid_pos.x, grid_pos.y, TileType::VOID);
+			tilemap.set(grid_pos.x, grid_pos.y, tile::TileType::VOID);
 		}
 	}
 	
@@ -717,8 +718,12 @@ private:
 				math::Vec2i target = player.vector_facing() * util::TILE_SIZE * util::SPRITE_SCALE;
 				math::Vec2i target_world_pos = player.get_position() + target;
 				math::Vec2i target_grid_pos = util::world_pos_to_grid(target_world_pos);
-				TileType tile = tilemap.get(target_grid_pos.x, target_grid_pos.y);
+
+				tile::TileType tile = tilemap.get(target_grid_pos.x, target_grid_pos.y);
 				tile::TileDefinition target_tile = tileset.definition_for(tile);
+
+				Entity *target_entity = tilemap.get_entity(target_grid_pos.x, target_grid_pos.y);
+				if (target_entity) break;
 
 				sf::Sprite &void_rod_sprite = sprites.at("spr_void_rod_0");
 
@@ -745,12 +750,12 @@ private:
 				if (!player.has_tile()) {
 					if (target_tile.is_pickable) {
 						player.pick_up_place_tile(tile);
-						tilemap.set(target_grid_pos.x, target_grid_pos.y, TileType::VOID);
+						tilemap.set(target_grid_pos.x, target_grid_pos.y, tile::TileType::VOID);
 						sounds.at("snd_voidrod_store").play();
 
 					}
-				} else if (tile == TileType::VOID) {
-					TileType place = player.pick_up_place_tile(tile);
+				} else if (tile == tile::TileType::VOID) {
+					tile::TileType place = player.pick_up_place_tile(tile);
 					tilemap.set(target_grid_pos.x, target_grid_pos.y, place);
 					sounds.at("snd_voidrod_place").play();
 				}
@@ -939,7 +944,10 @@ private:
 		math::Vec2i target_grid_pos = util::world_pos_to_grid(player.get_position() + target);
 
 		tile::TileDefinition target_tile = tileset.definition_for(tilemap.get(target_grid_pos.x, target_grid_pos.y));
-		player.move(target, target_tile);
+		Entity *target_entity = tilemap.get_entity(target_grid_pos.x, target_grid_pos.y);
+
+		player.move(target, target_tile, target_entity);
+
 		if (target_tile.is_stairs and not tilemap.get_level_next().empty()) {
 			inputs_locked = true;
 			sounds["snd_stairs"].play();
@@ -970,7 +978,7 @@ private:
 
 		for (int32_t y = 0; y < tilemap.get_height(); y++) {
 			for (int32_t x = 0; x < tilemap.get_width(); x++) {
-				const TileType tile = tilemap.get(x, y);
+				const tile::TileType tile = tilemap.get(x, y);
 				tile::TileDefinition definition = tileset.definition_for(tile);
 				math::Vec2i position = {x, y};
 
@@ -1009,7 +1017,7 @@ private:
 	}
 
 	inline void scroll_tiles(const int step) {
-		size_t tile_count = static_cast<size_t>(TileType::COUNT);
+		size_t tile_count = static_cast<size_t>(tile::TileType::COUNT);
 
 		int new_index = static_cast<int>(current_tile) + step;
 		if (new_index < 0)
@@ -1017,7 +1025,7 @@ private:
 		else if (new_index >= tile_count)
 			new_index -= tile_count;
 
-		current_tile = static_cast<TileType>(new_index);
+		current_tile = static_cast<tile::TileType>(new_index);
 	}
 };
 

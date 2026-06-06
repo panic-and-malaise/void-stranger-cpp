@@ -16,7 +16,8 @@
 #include <SFML/Audio/Sound.hpp>
 #include <SFML/Audio/SoundBuffer.hpp>
 
-#include "tile.hpp"
+#include "entity.hpp"
+#include "tile_type.hpp"
 #include "tile_definition.hpp"
 #include "util.hpp"
 #include "vec2i.hpp"
@@ -284,16 +285,16 @@ public:
 			auto void_rod = sprites.find("spr_voidrod_icon_1");
 
 			switch (picked_up_tile) {
-				case TileType::VOID:
+				case tile::TileType::VOID:
 					void_rod = sprites.find("spr_voidrod_icon_1");
 					break;
-				case TileType::FLOOR:
+				case tile::TileType::FLOOR:
 					void_rod = sprites.find("spr_voidrod_icon_2");
 					break;
-				case TileType::GLASS:
+				case tile::TileType::GLASS:
 					void_rod = sprites.find("spr_voidrod_icon_3");
 					break;
-				case TileType::GOAL:
+				case tile::TileType::GOAL:
 					void_rod = sprites.find("spr_voidrod_icon_5");
 					break;
 				default:
@@ -406,7 +407,7 @@ public:
 		primary_animation.timer = 0.f;
 	}
 
-	void move(const math::Vec2i pos, tile::TileDefinition target_tile) {
+	void move(const math::Vec2i pos, tile::TileDefinition target_tile, Entity *entity) {
 		if (move_timer > 0.0f) return;
 		if (move_timer <= 0.0f) move_timer = time_between_movements;
 
@@ -441,12 +442,15 @@ public:
 		}
 
 		// Can't move, push against wall
-		if (target_tile.is_collidable) {
+		if (target_tile.is_collidable or entity) {
 			move_timer = time_between_punches;
 
 			sounds["snd_push_small"].play();
 
 			play_push_animation();
+
+			if (entity)
+				entity->on_bump(*this, vector_facing());
 
 			return;
 		}
@@ -532,12 +536,12 @@ public:
 		effects.clear();
 	}
 
-	TileType pick_up_place_tile(const TileType tile) {
+	tile::TileType pick_up_place_tile(const tile::TileType tile) {
 		play_push_animation();
 		play_void_rod_animation();
 		if (has_tile()) {
-			TileType previous = picked_up_tile;
-			picked_up_tile = TileType::VOID;
+			tile::TileType previous = picked_up_tile;
+			picked_up_tile = tile::TileType::VOID;
 			return previous;
 		}
 		else
@@ -546,11 +550,11 @@ public:
 	}
 
 	void clear_held_tile() {
-		picked_up_tile = TileType::VOID;
+		picked_up_tile = tile::TileType::VOID;
 	}
 
 	bool has_tile() const {
-		return picked_up_tile != TileType::VOID;
+		return picked_up_tile != tile::TileType::VOID;
 	}
 private:
 	math::Vec2i position{};
@@ -565,7 +569,7 @@ private:
 	bool void_sword = false;
 	bool void_rod_true = false;
 
-	TileType picked_up_tile = TileType::VOID;
+	tile::TileType picked_up_tile = tile::TileType::VOID;
 
 	std::unordered_map<std::string, sf::Sprite> sprites;
 	std::unordered_map<std::string, sf::SoundBuffer> sound_buffers;
