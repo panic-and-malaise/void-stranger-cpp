@@ -97,6 +97,7 @@ public:
 
 		event_manager.emplace_event(1.f, [&]() {
 			player.set_health(7);
+			sounds.at("snd_push").play();
 		});
 		room_transition.start_open(player.get_position_centered());
 		player.play_fall_animation();
