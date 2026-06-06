@@ -679,7 +679,7 @@ private:
 	Facing facing = Facing::DOWN;
 	int health = 10;
 
-	bool void_rod = false;
+	bool void_rod = true;
 	bool void_memory = false;
 	bool void_wings = false;
 	bool void_sword = false;

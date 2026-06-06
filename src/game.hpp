@@ -976,10 +976,11 @@ private:
 
 		help_menu << "Controls:\n\n";
 
-		help_menu << "  Arrow Keys \t\t\t\t move\n\n";
+		help_menu << "  Arrow Keys \t\t\t\t move\n";
 		help_menu << "  Z \t\t\t\t\t pick up tile\n";
-
+		help_menu << "  X \t\t\t\t\t pathfind to end\n";
 		help_menu << "  D \t\t\t\t\t debug menu\n";
+
 		help_menu << "\n";
 
 		std::cout << help_menu.str();
