@@ -11,3 +11,15 @@ c 7 A 0 0 3 0 3 0 0 0 3 3 : 0 0 ##
 9 3 0 0 0 3 3 3 3 0 0 0 0 : 0 0 ##
 ; < < < < < < < < < < < < = 0 0 ##
 U U U U U U U U U U U U U U U U U U 
+ENTITIES
+EGG 10 4
+EGG 11 4
+EGG 12 4
+EGG 9 5
+EGG 9 6
+EGG 10 6
+EGG 6 5
+EGG 1 5
+EGG 2 6
+CHEST 3 1
+ATONER 4 2

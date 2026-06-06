@@ -33,6 +33,7 @@ static constexpr size_t WINDOW_HEIGHT = 432;
 
 static constexpr size_t SPRITE_SCALE = 3;
 static constexpr size_t TILE_SIZE = 16;
+static constexpr int TILE_SIZE_SCALED = TILE_SIZE * SPRITE_SCALE;
 
 inline constexpr float PI = 3.14159265358979323846;
 

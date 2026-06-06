@@ -11,3 +11,6 @@ level_next br_006.txt
 3 3 3 H 9 0 3 3 : J 3 3 3 3 0 0 ##
 3 3 3 H ; < < < = J 3 3 3 3 0 0 ##
 U U U U U U U U U U U U U U U U U U 
+ENTITIES
+CHEST 5 5
+ATONER 6 0

@@ -3,7 +3,7 @@ player 4 5
 br 8
 level_next br_009.txt
 3 3 N 6 7 _ O I I I I I I 3 ####
-3 H ] A 1 ^ 7 7 7 7 7 7 8 O 0 0 ##
+3 H ] A 3 ^ 7 7 7 7 7 7 8 O 0 0 ##
 3 H 9 0 0 0 0 0 0 0 0 0 ^ 8 0 0 ##
 3 H 9 0 0 0 V < < a 0 0 0 : 0 0 ##
 3 H 9 0 0 0 : P ] A 0 0 3 : 0 0 ##
@@ -11,3 +11,11 @@ level_next br_009.txt
 3 H ; < < < ` E 9 0 0 0 3 : 0 0 ##
 3 K G G G G G H b < < < < ` 0 0 ##
 U U U U U U U U U U U U U U U U U U 
+ENTITIES
+EGG 3 3
+EGG 4 3
+EGG 5 3
+EGG 10 4
+EGG 11 4
+EGG 10 6
+EGG 11 6

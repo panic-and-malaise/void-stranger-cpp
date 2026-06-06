@@ -1,0 +1,85 @@
+#ifndef MALAISE_TILE_TYPE_HPP
+#define MALAISE_TILE_TYPE_HPP
+
+#include <cstddef>
+
+namespace malaise::tile {
+enum class TileType {
+	FLOOR = 0,
+	FLOOR_UNDER = 1,
+	GOAL = 2,
+	VOID = 3,
+	GLASS = 4,
+	BOUNDS = 5,
+
+	WALL_CORNER_TOP_LEFT = 6,
+	WALL_TOP = 7,
+	WALL_CORNER_TOP_RIGHT = 8,
+
+	WALL_SIDE_LEFT = 9,
+	WALL_SIDE_RIGHT = 10,
+
+	WALL_CORNER_BOTTOM_LEFT = 11,
+	WALL_BOTTOM = 12,
+	WALL_CORNER_BOTTOM_RIGHT = 13,
+
+	STATUE_ABADDON = 14,
+
+	WALL_0 = 15,
+	WALL_1 = 16,
+	WALL_2 = 17,
+	WALL_3 = 18,
+	WALL_4 = 19,
+	WALL_5 = 20,
+
+	WALL_EDGE_0,
+	WALL_EDGE_1,
+	WALL_EDGE_2,
+	WALL_EDGE_3,
+	WALL_EDGE_4,
+	WALL_EDGE_5,
+	WALL_EDGE_6,
+	WALL_EDGE_7,
+	WALL_EDGE_8,
+	WALL_EDGE_9,
+	WALL_EDGE_10,
+	WALL_EDGE_11,
+	WALL_EDGE_12,
+	WALL_EDGE_13,
+	WALL_EDGE_14,
+	WALL_EDGE_15,
+
+	BLANK_WHITE,
+
+	WALL_6,
+	WALL_7,
+	WALL_8,
+	WALL_9,
+	WALL_10,
+	WALL_11,
+	WALL_12,
+	WALL_13,
+
+	WALL_14,
+	WALL_15,
+	WALL_16,
+	WALL_17,
+	WALL_18,
+	WALL_19,
+
+	EGG,
+	CHEST_CLOSE,
+	CHEST_OPEN,
+	ATONER,
+	CHEST_BIG_CLOSE,
+	CHEST_BIG_OPEN,
+
+	COUNT
+};
+
+constexpr size_t TileTypeCount = static_cast<size_t>(TileType::COUNT);
+
+}
+
+#endif // !MALAISE_TILE_TYPE_HPP
+
