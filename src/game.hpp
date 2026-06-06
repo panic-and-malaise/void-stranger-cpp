@@ -501,6 +501,7 @@ private:
 		for (auto &entity : tilemap.get_entities()) {
 			if (entity->falling) {
 				play_effect("fall", entity->get_position() * util::TILE_SIZE_SCALED);
+				sounds.at("snd_fall").play();
 				entity->falling = false;
 				entity->dead = true;
 			}
