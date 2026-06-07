@@ -550,12 +550,16 @@ public:
 		if (target_tile.is_collidable or entity) {
 			move_timer = time_between_punches;
 
-			sounds["snd_push_small"].play();
 
 			play_push_animation();
 
-			if (entity and not push_tile.is_collidable and not push_entity)
+			if (entity and not push_tile.is_collidable and not push_entity) {
 				entity->on_bump(*this, vector_facing());
+				sounds.at("snd_push").play();
+				return;
+			}
+
+			sounds.at("snd_push_small").play();
 
 			return;
 		}
