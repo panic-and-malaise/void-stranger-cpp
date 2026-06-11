@@ -14,11 +14,14 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
 
-# Statically link libraries for Windows build)
-set(BUILD_SHARED_LIBS OFF)
 
 # Fetch and configure latest SFML version
 include(FetchContent)
+
+# Statically link libraries for Windows build
+set(BUILD_SHARED_LIBS OFF)
+set(SFML_BUILD_NETWORK OFF CACHE BOOL "" FORCE)
+
 FetchContent_Declare(SFML
     GIT_REPOSITORY https://github.com/SFML/SFML.git
     GIT_TAG 3.1.0
