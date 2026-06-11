@@ -56,12 +56,11 @@ public:
 
 			glyphs.emplace(
 				ascii,
-				Glyph {{
-					std::stoi(fields[1]),
-					std::stoi(fields[2]),
-					std::stoi(fields[3]),
-					std::stoi(fields[4])
-					},
+				Glyph {
+					sf::IntRect(
+						{ std::stoi(fields[1]), std::stoi(fields[2]) },
+						{ std::stoi(fields[3]), std::stoi(fields[4]) }
+					),
 					std::stoi(fields[5]),
 					std::stoi(fields[6])
 				}
@@ -89,12 +88,12 @@ public:
 				glyph.texture_rect
 			);
 
-			sprite.setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
+			sprite.setScale({util::SPRITE_SCALE, util::SPRITE_SCALE});
 
-			sprite.setPosition(
+			sprite.setPosition({
 				cursor_x + glyph.offset * util::SPRITE_SCALE,
 				position.y
-			);
+			});
 
 			target.draw(sprite);
 

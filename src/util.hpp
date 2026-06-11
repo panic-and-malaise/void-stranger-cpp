@@ -46,7 +46,10 @@ inline sf::Vector2f integer_vector_to_float(const sf::Vector2i vi) {
 }
 
 inline void center_element(sf::Transformable &element, const sf::FloatRect &bounds) {
-	element.setOrigin(bounds.width / 2, bounds.height / 2);
+	element.setOrigin({
+		bounds.size.x / 2,
+		bounds.size.y / 2
+	});
 }
 
 inline math::Vec2i grid_pos_to_world(const size_t x, const size_t y) {
