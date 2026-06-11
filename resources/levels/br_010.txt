@@ -1,0 +1,38 @@
+size 18 9
+player 3 5
+br 10
+level_next br_010.txt
+c 7 7 8 Y 7 7 7 7 7 7 7 7 8 ####
+9 0 2 : 9 0 0 0 0 0 0 0 0 : 0 0 ##
+9 0 0 : 9 0 0 0 0 0 0 0 0 : 0 0 ##
+9 0 0 : 9 0 0 0 0 0 0 0 0 : 0 0 ##
+9 0 0 @ A 0 0 0 0 0 0 0 0 : 0 0 ##
+9 0 0 0 0 0 0 0 0 0 0 0 0 : 0 0 ##
+9 0 0 \ a 0 0 0 0 0 0 0 0 : 0 0 ##
+; < < = b < < < < < < < < = 0 0 ##
+U U U U U U U U U U U U U U U U U U 
+ENTITIES
+EGG 6 1
+EGG 11 1
+EGG 5 2
+EGG 7 2
+EGG 8 2
+EGG 9 2
+EGG 10 2
+EGG 12 2
+EGG 6 3
+EGG 8 3
+EGG 5 4
+EGG 7 4
+EGG 8 4
+EGG 10 4
+EGG 12 4
+EGG 6 5
+EGG 8 5
+EGG 10 5
+EGG 12 5
+EGG 5 6
+EGG 7 6
+EGG 9 6
+EGG 11 6
+CHEST 11 3

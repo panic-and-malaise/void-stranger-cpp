@@ -286,7 +286,7 @@ private:
 		tilemap.set(6, 0, tile::TileType::WALL_TOP);
 		tilemap.set(7, 0, tile::TileType::WALL_CORNER_TOP_RIGHT);
 
-		tilemap.load_from_file("br_002.txt");
+		tilemap.load_from_file("br_001.txt");
 		player.set_position_grid(tilemap.get_player_start_pos());
 	}
 
