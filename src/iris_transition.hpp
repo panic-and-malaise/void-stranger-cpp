@@ -2,6 +2,7 @@
 #define MALAISE_IRIS_TRANSITION_HPP
 
 #include "vec2i.hpp"
+#include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/Graphics/RenderTarget.hpp>
 #include <SFML/System/Vector2.hpp>
 namespace malaise::animation {
@@ -73,12 +74,12 @@ public:
         rect.setFillColor(sf::Color::Black);
 
         // Top
-        rect.setPosition(0.f, 0.f);
+        rect.setPosition({0.f, 0.f});
         rect.setSize({static_cast<float>(size.x), top});
         target.draw(rect);
 
         // Bottom
-        rect.setPosition(0.f, bottom);
+        rect.setPosition({0.f, bottom});
         rect.setSize({
             static_cast<float>(size.x),
             static_cast<float>(size.y) - bottom
@@ -86,7 +87,7 @@ public:
         target.draw(rect);
 
         // Left
-        rect.setPosition(0.f, top);
+        rect.setPosition({0.f, top});
         rect.setSize({
             left,
             bottom - top
@@ -94,7 +95,7 @@ public:
         target.draw(rect);
 
         // Right
-        rect.setPosition(right, top);
+        rect.setPosition({right, top});
         rect.setSize({
             static_cast<float>(size.x) - right,
             bottom - top

@@ -1,13 +1,9 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.28)
+project(void-stranger LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
-
-# -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-# System dependant, if SFML is having issues.
-
-project(spa-dz-03 LANGUAGES CXX)
 
 if(NOT CMAKE_BUILD_TYPE)
 	set(default_build_type "Debug")
@@ -21,11 +17,11 @@ message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
 # Statically link libraries for Windows build)
 set(BUILD_SHARED_LIBS OFF)
 
-# Fetch and configure SFML version 2.6.2
+# Fetch and configure latest SFML version
 include(FetchContent)
 FetchContent_Declare(SFML
     GIT_REPOSITORY https://github.com/SFML/SFML.git
-    GIT_TAG 2.6.2
+    GIT_TAG 3.1.0
     GIT_SHALLOW ON
     EXCLUDE_FROM_ALL
     SYSTEM
@@ -45,10 +41,10 @@ target_include_directories(main PRIVATE src)
 target_link_libraries(
 	main
 	PRIVATE
-	sfml-system
-	sfml-window
-	sfml-graphics
-	sfml-audio
+	SFML::System
+	SFML::Window
+	SFML::Graphics
+	SFML::Audio
 )
 target_compile_features(main PRIVATE cxx_std_20)
 

@@ -26,9 +26,6 @@ public:
 	}
 
 	void draw(sf::RenderTarget &target, const TileMap &map, const TileSet &set) {
-		// simple sprite based rendering version, try VertexArray later
-		sf::Sprite sprite;
-
 		for (size_t y = 0; y < map.get_height(); y++) {
 			for (size_t x = 0; x < map.get_width(); x++) {
 				TileType type = map.get(x, y);
@@ -38,40 +35,51 @@ public:
 					TileType below = map.get(x, y + 1);
 
 					if (below == TileType::VOID) {
-						util::render::draw_tile(target, TileType::FLOOR_UNDER, set, {static_cast<int32_t>(x), static_cast<int32_t>(y + 1)});
+						util::render::draw_tile(
+							target,
+							TileType::FLOOR_UNDER,
+							set,
+							{
+								static_cast<int32_t>(x),
+								static_cast<int32_t>(y + 1)
+							}
+						);
 					}
 				}
 
 				const sf::Texture *texture = set.texture(type);
 				if (!texture) continue;
 
-				sprite.setTexture(*texture);
-				sprite.setTextureRect(set.rect_for(type));
+				sf::Sprite sprite(*texture, set.rect_for(type));
 
-				sprite.setOrigin(0, 0);
-				sprite.setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
+				sprite.setOrigin({0.f, 0.f});
+				sprite.setScale({
+					util::SPRITE_SCALE,
+					util::SPRITE_SCALE
+				});
 
 				if (definition.is_flipped_horizontal) {
-					sprite.setOrigin(
-						definition.texture_rect.width,
+					sprite.setOrigin({
+						static_cast<float>(definition.texture_rect.size.x),
 						sprite.getOrigin().y
-					);
-					sprite.scale(-1, 1);
+					});
+					sprite.scale({-1.f, 1.f});
 				}
 
 				if (definition.is_flipped_vertical) {
-					sprite.setOrigin(
+					sprite.setOrigin({
 						sprite.getOrigin().x,
-						definition.texture_rect.height
-					);
-					sprite.scale(1, -1);
+						static_cast<float>(definition.texture_rect.size.y)
+					});
+					sprite.scale({1.f, -1.f});
 				}
 
 				math::Vec2i position = util::grid_pos_to_world(x, y);
-				sprite.setPosition(
-					position.x,
-					position.y
-				);
+
+				sprite.setPosition({
+					static_cast<float>(position.x),
+					static_cast<float>(position.y)
+				});
 
 				target.draw(sprite);
 			}

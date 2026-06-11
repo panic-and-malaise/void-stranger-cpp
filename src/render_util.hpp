@@ -13,40 +13,38 @@
 namespace malaise::util::render {
 
 inline void draw_tile(sf::RenderTarget &target, const tile::TileType type, const tile::TileSet &set, const math::Vec2i position_grid) {
-	sf::Sprite sprite;
-
 	const tile::TileDefinition definition = set.definition_for(type);
 
 	const sf::Texture *texture = set.texture(type);
 	if (!texture) return;
 
-	sprite.setTexture(*texture);
+	sf::Sprite sprite(*texture);
 	sprite.setTextureRect(set.rect_for(type));
 
-	sprite.setOrigin(0, 0);
-	sprite.setScale(util::SPRITE_SCALE, util::SPRITE_SCALE);
+	sprite.setOrigin({ 0, 0 });
+	sprite.setScale({ util::SPRITE_SCALE, util::SPRITE_SCALE });
 
 	if (definition.is_flipped_horizontal) {
-		sprite.setOrigin(
-			definition.texture_rect.width,
+		sprite.setOrigin({
+			static_cast<float>(definition.texture_rect.size.x),
 			sprite.getOrigin().y
-		);
-		sprite.scale(-1, 1);
+		});
+		sprite.scale({-1, 1});
 	}
 
 	if (definition.is_flipped_vertical) {
-		sprite.setOrigin(
+		sprite.setOrigin({
 			sprite.getOrigin().x,
-			definition.texture_rect.height
-		);
-		sprite.scale(1, -1);
+			static_cast<float>(definition.texture_rect.size.y)
+		});
+		sprite.scale({1, -1});
 	}
 
 	math::Vec2i position = util::grid_pos_to_world(position_grid);
-	sprite.setPosition(
-		position.x,
-		position.y
-	);
+	sprite.setPosition({
+		static_cast<float>(position.x),
+		static_cast<float>(position.y)
+	});
 
 	target.draw(sprite);
 }

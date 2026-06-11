@@ -14,10 +14,10 @@ class Tile {
 public:
 	Tile(const math::Vec2i position_, const sf::Sprite &sprite_, TileType type_ = TileType::FLOOR)
 		: position(position_), sprite(sprite_), type(type_) {
-			sprite.setPosition(
-				position.x * util::TILE_SIZE * util::SPRITE_SCALE,
-				position.y * util::TILE_SIZE * util::SPRITE_SCALE
-			);
+			sprite.setPosition({
+				static_cast<float>(position.x * util::TILE_SIZE * util::SPRITE_SCALE),
+				static_cast<float>(position.y * util::TILE_SIZE * util::SPRITE_SCALE)
+			});
 		}
 
 	void draw(sf::RenderTarget &target) {

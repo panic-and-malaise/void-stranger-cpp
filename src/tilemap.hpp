@@ -11,7 +11,6 @@
 
 #include <SFML/Graphics/RenderTarget.hpp>
 
-#include "animation_instance.hpp"
 #include "entity_chest.hpp"
 #include "entity_chest_void_rod.hpp"
 #include "file_wrapper.hpp"

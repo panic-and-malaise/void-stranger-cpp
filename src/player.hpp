@@ -1,11 +1,12 @@
 #ifndef MALAISE_PLAYER_HPP
 #define MALAISE_PLAYER_HPP
 
+#include <SFML/Graphics/Rect.hpp>
+#include <SFML/System/Angle.hpp>
 #include <SFML/System/Vector2.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <iostream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -287,9 +288,8 @@ public:
 
 			if (buffer.loadFromFile(path)) {
 				sound_buffers.emplace(sound_name, buffer);
-				sf::Sound sound;
-				sound.setVolume(50.f);
-				sound.setBuffer(sound_buffers[sound_name]);
+				sf::Sound sound(sound_buffers[sound_name]);
+				sound.setVolume(75.f);
 				sounds.emplace(sound_name, sound);
 			}
 		}
@@ -298,24 +298,24 @@ public:
 	void draw(sf::RenderTarget &target) {
 		sf::Sprite *sprite = primary_animation.animation->frames[primary_animation.current_frame];
 		if (sprite) {
-			sprite->setPosition(
-				position.x + render_offset.x,
-				position.y + render_offset.y
-			);
+			sprite->setPosition({
+				static_cast<float>(position.x + render_offset.x),
+				static_cast<float>(position.y + render_offset.y)
+			});
 
 			for (auto &effect : effects) {
 				sf::Sprite *frame = effect.animation->frames[effect.current_frame];
 				sf::Vector2f bounds = {
-					frame->getLocalBounds().width / 2,
-					frame->getLocalBounds().height / 2
+					frame->getLocalBounds().size.x / 2,
+					frame->getLocalBounds().size.y / 2
 				};
 
-				frame->setOrigin(bounds.x, bounds.y);
-				frame->setPosition(
+				frame->setOrigin(bounds);
+				frame->setPosition({
 					position.x + render_offset.x + effect.offset.x + bounds.x * util::SPRITE_SCALE,
 					position.y + render_offset.y + effect.offset.y + bounds.y * util::SPRITE_SCALE
-				);
-				frame->setRotation(effect.rotation);
+				});
+				frame->setRotation(sf::degrees(effect.rotation));
 				target.draw(*frame);
 			}
 
@@ -332,10 +332,10 @@ public:
 
 			if (locust == sprites.end()) return;
 
-			locust->second.setPosition(
+			locust->second.setPosition({
 				4 * util::TILE_SIZE * util::SPRITE_SCALE,
 				util::WINDOW_HEIGHT - util::TILE_SIZE * util::SPRITE_SCALE
-			);
+			});
 			target.draw(locust->second);
 		}
 
@@ -361,27 +361,27 @@ public:
 			}
 
 			if (void_rod == sprites.end()) return;
-			void_rod->second.setPosition(
+			void_rod->second.setPosition({
 				6 * util::TILE_SIZE * util::SPRITE_SCALE,
 				util::WINDOW_HEIGHT - util::TILE_SIZE * util::SPRITE_SCALE
-			);
+			});
 			target.draw(void_rod->second);
 		}
 
 		auto items = sprites.find("spr_items_0");
 		if (items == sprites.end()) return;
 
-		items->second.setTextureRect({0, 0, 0, 0});
-		items->second.setPosition(
+		items->second.setTextureRect(sf::IntRect({0, 0}, {0, 0}));
+		items->second.setPosition({
 			8 * util::TILE_SIZE * util::SPRITE_SCALE,
 			util::WINDOW_HEIGHT - util::TILE_SIZE * util::SPRITE_SCALE
-		);
+		});
 
 		if (has_void_memory()) {
-			items->second.setTextureRect({
-				0, 0,
-				16, 15
-			});
+			items->second.setTextureRect(sf::IntRect(
+				{ 0, 0 },
+				{ 16, 15 }
+			));
 		}
 
 		target.draw(items->second);
@@ -485,11 +485,11 @@ public:
 	}
 
 	void play_fall_animation() {
-		sounds["snd_player_fall"].play();
-		sprites.at("spr_player_drop_0").setPosition(
-			position.x + render_offset.x,
-			position.y + render_offset.y
-		);
+		sounds.at("snd_player_fall").play();
+		sprites.at("spr_player_drop_0").setPosition({
+			static_cast<float>(position.x + render_offset.x),
+			static_cast<float>(position.y + render_offset.y)
+		});
 
 		falling_in = true;
 		play_animation("drop");
@@ -577,7 +577,7 @@ public:
 		if (above_pit) {
 			coyote_timer += delta;
 			if (coyote_timer > COYOTE_TIME) {
-				sounds["snd_player_fall"].play();
+				sounds.at("snd_player_fall").play();
 				play_animation("fall");
 				health = 0;
 				dead = true;
@@ -683,7 +683,7 @@ private:
 	Facing facing = Facing::DOWN;
 	int health = 10;
 
-	bool void_rod = true;
+	bool void_rod = false;
 	bool void_memory = false;
 	bool void_wings = false;
 	bool void_sword = false;
