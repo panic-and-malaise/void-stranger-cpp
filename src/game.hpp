@@ -691,7 +691,7 @@ private:
 		if (render_accumulator.asSeconds() >= 1.f / UPDATES_PER_SECOND) {
 			float fps = 1.f / time_elapsed.asSeconds();
 
-			window.setTitle(WINDOW_TITLE + " | " + std::to_string((int)(fps + 0.5f)) + " FPS");
+			// window.setTitle(WINDOW_TITLE + " | " + std::to_string((int)(fps + 0.5f)) + " FPS");
 
 			render_accumulator = sf::Time::Zero;
 		}
